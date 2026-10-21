@@ -307,6 +307,18 @@ function createSocial(S){
     return true;
   }
 
+  // ---------- set role oleh pemilik server (console & panel admin localhost) ----------
+  function setRole(name, val, by){
+    const a = acc(name); if (!a) return {ok: false, err: 'Akun ' + name + ' tidak ditemukan.'};
+    if (!['dev', 'mod', 'player'].includes(val)) return {ok: false, err: 'Role harus dev, mod, atau player.'};
+    a.role = val === 'player' ? undefined : val; S.saveAccounts(); S.roleChanged(a.name); staffLog(by, 'setrole', a.name, {role: val});
+    return {ok: true, text: a.name + ' sekarang ' + ROLE_NAME[val] + '.'};
+  }
+  function listAccounts(){
+    return Object.values(S.accounts).map(a => ({name: a.name, role: a.role || 'player', online: !!S.findOnline(a.name), created: a.created || null}))
+      .sort((x, y) => (RANK[y.role] - RANK[x.role]) || x.name.localeCompare(y.name));
+  }
+
   // ---------- console server (owner) ----------
   function consoleCmd(line){
     const [cmd, name, val] = line.trim().split(/\s+/);
@@ -318,9 +330,8 @@ function createSocial(S){
     if (cmd === 'stop') return S.shutdown();
     const a = acc(name); if (!a) return console.log('Akun ' + name + ' tidak ditemukan.');
     if (cmd === 'role'){
-      if (!['dev', 'mod', 'player'].includes(val)) return console.log('Pakai: role NAMA dev|mod|player');
-      a.role = val === 'player' ? undefined : val; S.saveAccounts(); S.roleChanged(a.name); staffLog('SERVER', 'setrole', a.name, {role: val});
-      return console.log(a.name + ' sekarang ' + ROLE_NAME[val === 'player' ? 'player' : val] + '.');
+      const r = setRole(a.name, val, 'SERVER');
+      return console.log(r.ok ? r.text : r.err);
     }
     if (cmd === 'unban'){ delete a.ban; S.saveAccounts(); staffLog('SERVER', 'unban', a.name); return console.log(a.name + ' tidak di-ban lagi.'); }
     if (cmd === 'unipban'){ for (const ip in ipbans) if (ipbans[ip].user === a.name) delete ipbans[ip]; write(BAN_FILE, ipbans); delete a.ban; S.saveAccounts(); return console.log('IP ban ' + a.name + ' dicabut.'); }
@@ -330,6 +341,6 @@ function createSocial(S){
 
   return {RANK, ROLE_NAME, roleOf, rankOf, display, muteInfo, loginBlock, friendList, friendReq, friendAccept, friendDecline, friendRemove,
           report, tradeRequest, tradeAccept, tradeDecline, tradeOffer, tradeOk, tradeConfirm, tradeCancel, onLeave, inTrade: u => tradeOf.has(u),
-          command, consoleCmd, pushFriends, staffLog, REASONS};
+          command, consoleCmd, setRole, listAccounts, pushFriends, staffLog, REASONS};
 }
 module.exports = {createSocial, RANK};

@@ -23,12 +23,19 @@ Perangkat lain di WiFi yang sama cukup buka alamat itu di browser, lalu pilih **
 - Login salah 5x = diblokir 60 detik.
 
 ## Role
-Role hanya bisa diberikan dari **jendela server**:
+Role diberikan oleh pemilik server, dengan salah satu dari dua cara:
 
-    role NAMA dev      (Developer: nama @ oranye)
-    role NAMA mod      (Moderator: nama @ ungu)
-    role NAMA player   (cabut role)
-    help               (daftar perintah server)
+1. **Panel Role** (lebih mudah): buka **http://localhost:8080/admin** di browser PC server. Alamatnya juga tampil di jendela server.
+   - Isinya daftar semua akun beserta status online dan pilihan Player, Moderator, atau Developer.
+   - Panel hanya bisa dibuka dari PC server sendiri. Dari HP atau laptop lain di WiFi, alamat itu menjawab "Not found".
+   - Halaman panel membawa token acak yang berganti setiap server dijalankan, supaya website lain tidak bisa diam-diam mengubah role.
+   - Perubahan dicatat di `staff-log.jsonl` sebagai ADMIN-PANEL.
+2. **Jendela server**:
+
+       role NAMA dev      (Developer: nama @ oranye)
+       role NAMA mod      (Moderator: nama @ ungu)
+       role NAMA player   (cabut role)
+       help               (daftar perintah server)
 
 Developer juga bisa mengangkat dan mencabut Moderator dari dalam game dengan `/setrole NAMA mod`.
 Staff hanya bisa menindak pemain dengan role yang lebih rendah. Semua aksi staff dicatat di `staff-log.jsonl`.

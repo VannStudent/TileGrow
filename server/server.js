@@ -549,6 +549,7 @@ const social = createSocial({
   teleport(c, world, st){ const w = worlds.get(world) || loadWorld(world); if (!w) return; if (c.world !== world) enterWorld(c, w); c.lastPos = null; c.send({t: 'tp', x: st ? st.x : null, y: st ? st.y : null}); },
   shutdown: () => shutdown()
 });
+const admin = require('./admin.js').createAdmin({social, port: PORT});
 
 // ---------- pesan ----------
 function handle(c, m){
@@ -701,6 +702,7 @@ const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer((req, res) => {
   let p;
   try { p = decodeURIComponent((req.url || '/').split('?')[0]); } catch(e){ res.writeHead(400); return res.end('Bad request'); }
+  if (admin.handle(req, res, p)) return;                    // panel role: hanya dari PC server (localhost)
   if (p === '/' || p === '/index.html') p = '/tilegrow.html';
   if (!/^\/(tilegrow\.html|js\/[a-z0-9_-]+\.js)$/i.test(p)){ res.writeHead(404); return res.end('Not found'); }
   fs.readFile(path.join(ROOT, p), (e, buf) => {
@@ -731,6 +733,7 @@ server.listen(PORT, HOST, () => {
     if (a.family === 'IPv4' && !a.internal) console.log('  Di WiFi/LAN    : http://' + a.address + ':' + PORT);
   console.log('Data disimpan di ' + DATA + '. Tekan Ctrl+C untuk berhenti.');
   console.log('Ketik "help" di jendela ini untuk perintah server (misalnya: role NAMA dev).');
+  console.log('Panel role (hanya dari PC ini): ' + admin.url);
 });
 function shutdown(){ console.log('\nMenyimpan world & pemain...'); flushAll(); flushEcons(); process.exit(0); }
 // console server: atur role dari jendela server (ketik help)
