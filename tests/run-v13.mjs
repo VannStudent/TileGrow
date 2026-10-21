@@ -18,4 +18,4 @@ process.exit = code => {
   try { fs.rmSync(data, {recursive: true, force: true}); } catch(e){}
   origExit(code);
 };
-await import({security: './server-security.test.mjs', admin: './admin-panel.test.mjs'}[process.argv[2]] || './v13-economy-social.test.mjs');
+await import({security: './server-security.test.mjs', admin: './admin-panel.test.mjs', v14: './v14-features.test.mjs'}[process.argv[2]] || './v13-economy-social.test.mjs');

@@ -101,7 +101,8 @@ function showScreen(id){
 // tombol Kembali & Masuk World di bawah
 let lobbyFilter = 'semua';
 function renderLobby(){
-  $('lbUser').textContent = account + (online() ? ' · online di ' + net.addr : ' · offline'); $('lbFlag').innerHTML = flagHTML(playerFlag, 16);
+  $('lbUser').textContent = account; $('lbFlag').innerHTML = flagHTML(playerFlag, 16);
+  $('lbDot').classList.toggle('on', online()); $('lbDot').title = online() ? 'Online di ' + net.addr : 'Main offline';
   let all, ownedSet, lockedBy, countOf_ = () => 0;
   if (online()){
     all = net.worldList.map(w => w.name);
@@ -120,27 +121,62 @@ function renderLobby(){
   else if (lobbyFilter === 'milikku') list = [...ownedSet];
   else list = [...new Set([...lobbyHistory, ...all])];
   document.querySelectorAll('#scr-lobby .lbtab').forEach(x => x.classList.toggle('on', x.dataset.f === lobbyFilter));
-  $('lbFilterName').textContent = {semua:'Semua World', riwayat:'Riwayat', milikku:'World Milikku'}[lobbyFilter];
-  const btn = n => {
-    const cls = ownedSet.has(n) ? 'own' : lobbyHistory.includes(n) ? 'hist' : 'other';
-    const lk = lockedBy(n);
-    return '<button class="wbtn ' + cls + '" data-w="' + esc(n) + '" title="' + (lk ? 'Dikunci oleh ' + esc(lk) : 'Belum dikunci') + '">' +
-      (ownedSet.has(n) ? '🔒 ' : '') + esc(n) + (countOf_(n) ? ' <small>(' + countOf_(n) + ' 👤)</small>' : '') + '</button>';
+  const cur = normWorldName($('lbWorld').value);
+  // ketik nama: daftar ikut tersaring (world yang namanya mengandung ketikan)
+  if (cur) list = list.filter(n => n.includes(cur));
+  const card = n => {
+    const own = ownedSet.has(n), hist = lobbyHistory.includes(n), cls = own ? 'own' : hist ? 'hist' : 'other';
+    const lk = lockedBy(n), pc = countOf_(n);
+    const badge = own ? 'Milikku' : hist ? 'Dikunjungi' : lk ? 'Dikunci' : 'Terbuka';
+    const lockI = '<img src="' + icon('b30') + '" style="width:13px;height:13px;vertical-align:-2px;image-rendering:pixelated">';
+    const sub = own ? lockI + ' World Lock' : lk ? lockI + ' ' + esc(lk) : '';
+    return '<button type="button" class="wbtn ' + cls + (n === cur ? ' sel' : '') + '" data-w="' + esc(n) + '" title="' + (lk ? 'Dikunci oleh ' + esc(lk) : 'Belum dikunci') + '">' +
+      '<span class="wTop"><span class="wArt" style="background-image:url(' + worldThumb(n) + ')"></span><span class="wName" title="' + esc(n) + '">' + esc(n) + '</span></span>' +
+      '<span class="wMeta"><span class="wBadge">' + badge + '</span>' + (sub ? '<span>' + sub + '</span>' : '') + (pc ? '<span class="wOn">● ' + pc + ' main</span>' : '') + '</span></button>';
   };
-  $('lbWorlds').innerHTML = list.length ? list.map(btn).join('')
-    : '<span class="empty">' + (lobbyFilter === 'milikku' ? 'Belum ada world yang kamu kunci dengan World Lock.' : 'Belum ada. Ketik nama world lalu Masuk World.') + '</span>';
-  document.querySelectorAll('#lbWorlds .wbtn').forEach(x => x.onclick = ()=>{ $('lbWorld').value = x.dataset.w; $('lbWorld').focus(); updateEnterLabel(); });
+  $('lbFilterName').textContent = (cur ? 'Hasil "' + cur + '"' : {semua:'Semua World', riwayat:'Baru Dikunjungi', milikku:'World Milikku'}[lobbyFilter]) + ' · ' + list.length;
+  $('lbWorlds').innerHTML = list.length ? list.map(card).join('')
+    : cur ? '<span class="empty">Belum ada world bernama ' + esc(cur) + '. Tekan <b style="color:#7be37a">Buat World</b> untuk membuatnya.</span>'
+    : '<span class="empty">' + (lobbyFilter === 'milikku' ? 'Belum ada world yang kamu kunci. Pasang World Lock di world-mu supaya muncul di sini.' : lobbyFilter === 'riwayat' ? 'Belum ada world yang dikunjungi.' : 'Belum ada world. Ketik nama di atas lalu tekan Masuk World.') + '</span>';
+  document.querySelectorAll('#lbWorlds .wbtn').forEach(x => {
+    x.onclick = ()=>{ $('lbWorld').value = x.dataset.w; updateEnterLabel(); renderLobbySel(); };
+    x.ondblclick = ()=>{ $('lbWorld').value = x.dataset.w; joinWorld(); };
+  });
   const online_n = online() ? net.worldList.reduce((a, w) => a + w.players, 0) : 0;
-  $('lbMsg').innerHTML = '<span class="s">[S]</span> Mau ke mana, <b style="color:#7be37a">' + esc(account) + '</b>? ' +
-    (online() ? '(' + all.length + ' world di server, ' + online_n + ' pemain sedang main)' : '(' + all.length + ' world di akun ini)');
+  $('lbMsg').innerHTML = 'Halo, <b style="color:#7be37a">' + esc(account) + '</b>! Mau main di mana hari ini? ' +
+    '<span style="color:#8aa0bf">' + (online() ? online_n + ' pemain sedang online' : 'Mode offline: world tersimpan di perangkat ini') + '</span>';
   updateEnterLabel();
   setTimeout(()=> $('lbWorld').focus(), 30);
+}
+function renderLobbySel(){ const cur = normWorldName($('lbWorld').value); document.querySelectorAll('#lbWorlds .wbtn').forEach(x => x.classList.toggle('sel', x.dataset.w === cur)); }
+// gambar kecil tiap world (warna dari nama, supaya tiap world terlihat beda)
+const THUMBS = {};
+function worldThumb(n){
+  if (THUMBS[n]) return THUMBS[n];
+  let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const c = newCanvas(16), g = c.getContext('2d'), r = rng(h);
+  const skies = [['#7fc4f0','#bfe6ff'],['#ff9a6a','#ffd29a'],['#3a3f7a','#8a7ad8'],['#5ad8c8','#c8fff0']], sk = skies[h % 4];
+  for (let y=0;y<9;y++){ g.fillStyle = y < 4 ? sk[0] : sk[1]; g.fillRect(0,y,16,1); }
+  let gy = 9 + ((r()*2)|0);
+  for (let x=0;x<16;x++){ if (r() < .25) gy = Math.max(8, Math.min(11, gy + (r() < .5 ? -1 : 1)));
+    g.fillStyle = '#6fd34a'; g.fillRect(x,gy,1,1); g.fillStyle = '#9a6033'; g.fillRect(x,gy+1,1,16-gy); }
+  g.fillStyle = '#8893a6'; for (let i=0;i<5;i++) g.fillRect((r()*15)|0, 13 + ((r()*3)|0), 2, 1);
+  if (h % 3 === 0){ g.fillStyle = '#46a847'; g.fillRect(3,gy-4,4,3); g.fillStyle = '#6e4316'; g.fillRect(4,gy-1,2,1); }
+  g.fillStyle = '#fff8c8'; g.fillRect(12 - (h % 5), 2, 2, 2);
+  return THUMBS[n] = c.toDataURL();
 }
 function updateEnterLabel(){
   const v = normWorldName($('lbWorld').value);
   const exists = online() ? net.worldList.some(w => w.name === v) : !!worlds[v];
-  $('lbHint').textContent = !v ? 'Ketik nama world, lalu tekan Masuk World.' : exists ? 'Tekan Masuk World untuk masuk ke ' + v + '.' : 'World ' + v + ' belum ada. Tekan Buat World untuk membuatnya.';
+  const names = online() ? net.worldList.map(w => w.name) : Object.keys(worlds || {});
+  const near = v && !exists ? names.filter(n => n.startsWith(v)).slice(0, 3) : [];
+  $('lbHint').innerHTML = !v ? 'Ketik nama world, atau klik salah satu world di bawah (klik 2x untuk langsung masuk).'
+    : exists ? 'Tekan <b>Masuk World</b> untuk masuk ke <b>' + esc(v) + '</b>.'
+    : near.length ? 'Maksudmu ' + near.map(n => '<a href="#" class="wlNear" data-w="' + esc(n) + '">' + esc(n) + '</a>').join(', ') + '? Atau tekan <b style="color:#7be37a">Buat World</b> untuk membuat <b>' + esc(v) + '</b>.'
+    : 'World <b>' + esc(v) + '</b> belum ada. Tekan <b style="color:#7be37a">Buat World</b> untuk membuatnya.';
+  document.querySelectorAll('#lbHint .wlNear').forEach(a => a.onclick = e => { e.preventDefault(); $('lbWorld').value = a.dataset.w; updateEnterLabel(); renderLobby(); });
   $('lbEnter').textContent = v && !exists ? 'Buat World' : 'Masuk World';
+  if (typeof renderLobbySel === 'function') renderLobbySel();
 }
 function pushHistory(n){
   lobbyHistory = [n, ...lobbyHistory.filter(x => x !== n)].slice(0, 8);
@@ -212,7 +248,7 @@ function bindScreens(){
   $('lbForm').onsubmit = e => { e.preventDefault(); joinWorld(); };
   $('lbEnter').onclick = ()=> joinWorld();
   $('lbBack').onclick = ()=> logout();
-  $('lbWorld').addEventListener('input', ()=>{ $('lbErr').textContent = ''; updateEnterLabel(); });
+  $('lbWorld').addEventListener('input', ()=>{ $('lbErr').textContent = ''; renderLobby(); });
   document.querySelectorAll('#scr-lobby .lbtab').forEach(x => x.onclick = ()=>{ lobbyFilter = x.dataset.f; renderLobby(); });
   setInterval(()=>{ if (online() && !inGame && !document.getElementById('scr-lobby').classList.contains('hidden')) netRequestWorlds(); }, 4000);
 }

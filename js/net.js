@@ -174,9 +174,11 @@ function netOnMessage(m){
     case 'pjoin': addRemote(m.id, m.name, m.flag, m.state || null, m.role, m.display); if (!m.quiet) say('sys', (m.display || m.name) + ' masuk ke world.'); return;
     case 'pleave': { const r = net.players.get(m.id); if (r){ net.players.delete(m.id); if (!m.quiet) say('sys', r.display + ' keluar dari world.'); } if (net.trade && r && net.trade.with === r.name) closeTradeUI(); return; }
     case 'prole': { const r = net.players.get(m.id); if (r){ r.role = m.role; r.display = m.display; } return; }
+    case 'roll': return showRoll(m.i, m.kind, m.v, m.by);          // v1.4: hasil Dadu / Roulette dari server
     case 'pos': { const r = net.players.get(m.id); if (r) setRemoteState(r, m.s); return; }
     case 'ops':
       applyOps(m.from, m.ops || []);
+      if (typeof vendOpen !== 'undefined' && vendOpen !== null && (m.ops || []).some(o => o[0] === vendOpen)) renderVend();
       if (m.denied){ if (m.why) toast(m.why); sfx('deny'); }
       return;
     case 'chat': {
@@ -189,7 +191,7 @@ function netOnMessage(m){
     case 'kicked': netKickReason = m.reason; return;
     case 'left': return;
     // ----- v1.3 -----
-    case 'econ': return applyEcon(m);
+    case 'econ': applyEcon(m); if (typeof vendOpen !== 'undefined' && vendOpen !== null) renderVend(); return;
     case 'dropAdd': return addServerDrop(m.d);
     case 'dropDel': { const k = items.findIndex(it => it.sid === m.id); if (k >= 0){ if (m.by === net.myId) sfx(items[k].key === 'gem' ? 'gem' : 'pick'); items.splice(k, 1); } return; }
     case 'dropSet': { const it = items.find(it => it.sid === m.id); if (it) it.n = m.n; return; }

@@ -1,5 +1,5 @@
 'use strict';
-// TileGrow v1.3 — ekonomi di server. Data item, toko, resep, drop rate, quest, goals, dan level diambil langsung dari
+// TileGrow v1.4 — ekonomi di server. Data item, toko, resep, drop rate, quest, goals, dan level diambil langsung dari
 // js/data.js + js/world.js (dijalankan di sandbox vm), jadi aturannya sama persis dengan di browser.
 // Server memegang tas, gems, XP, quest; browser hanya menampilkan hasilnya.
 const vm = require('vm'), fs = require('fs'), path = require('path');
@@ -30,7 +30,7 @@ function loadEcon(root){
   const D = vm.runInContext(`({SHOP, BY_ID, RECIPES, GROW_MS, SEEDABLE, DROP_BLOCK, DROP_SEED, DROP_SEED_BG, GEM_FROM_BLOCK,
     GEM_FROM_TREE, WEAR, STACK, FIST, WRENCH, REACH, TS, COLS, ROWS, itemDef, recipe, xpNeeded})`, ctx);
   const G = vm.runInContext(`({addItem, takeItem, countOf, canAdd, questEvent, addXP, stat, claimQuest, rollQuests,
-    discoverRecipe, bagUpgradeCost, checkGoals, addGems: d => { gems += d; }})`, ctx);
+    discoverRecipe, bagUpgradeCost, checkGoals, convertLocks, addGems: d => { gems += d; }})`, ctx);
   const R = Math.random;
 
   // jalankan fungsi ekonomi untuk satu pemain. Hasil: nilai fungsi; pesan untuk pemain ada di econ.out
@@ -53,7 +53,7 @@ function loadEcon(root){
       if (D.SEEDABLE.includes(id) && R() < D.DROP_SEED) drops.push(['s' + id, 1]);
     }
     let ore = false;
-    if (d.gem){ drops.push(['gem', d.gem[0] + (R() * (d.gem[1] - d.gem[0] + 1) | 0)]); ore = true; }
+    if (d.gem){ drops.push(['gem', d.gem[0] + (R() * (d.gem[1] - d.gem[0] + 1) | 0)]); ore = !d.farm; }
     else if (R() < D.GEM_FROM_BLOCK) drops.push(['gem', 1]);
     return {drops, xp: d.xp || 1, bg: false, ore};
   }

@@ -1,4 +1,4 @@
-// TileGrow v0.4 — data, tekstur, dunia
+// TileGrow v1.4 — data, tekstur, dunia
 // Semua tekstur digambar lewat kode (pixel art 16x16), bukan aset game lain.
 const TS = 32, COLS = 100, ROWS = 60, STACK = 200, SAVE_KEY = 'tilegrow-save-v8';
 const OL = '#17121c';                 // outline kartun
@@ -23,7 +23,9 @@ const PAL = {
   41:['#b57a3c','#6e4316','#e0a861'],  42:['#8893a6','#515a69','#b9c3d2'],
   50:['#3fb86a','#1f6a3a','#9af0b8'],  51:['#5a7bd8','#2a3f8a','#b8e8ff'],
   52:['#3a3238','#1a1418','#ff7a2a'],  53:['#e0a52a','#7a4f10','#fff3a0'],
-  54:['#e85aa8','#7a2a6a','#ffe0f4']
+  54:['#e85aa8','#7a2a6a','#ffe0f4'],
+  34:['#5ae0f0','#1f6a8a','#e8ffff'],  60:['#f4f6fa','#9aa3b5','#ffffff'],
+  61:['#2a8a4a','#14472a','#f0d24a'],  62:['#3a7bd8','#1d3f78','#bfe6ff']
 };
 // kind: block padat, bg = dinding belakang, deco = tidak padat
 const T = {
@@ -50,17 +52,22 @@ const T = {
   DOOR:   {id:21, name:'Pintu',        hits:4,  xp:2,  price:20, deco:1, wrench:'door'},
   DISPLAY:{id:22, name:'Kotak Pajang', hits:4,  xp:2,  price:25, wrench:'display'},
   MAINDOOR:{id:23,name:'Pintu Utama',  hits:0,  deco:1},
-  WLOCK:  {id:30, name:'World Lock',   hits:0,  xp:0,  price:200, wrench:'lock', lock:'world'},
+  WLOCK:  {id:30, name:'World Lock',   hits:0,  xp:0,  price:1800, wrench:'lock', lock:'world'},
+  CLOCK:  {id:34, name:'Crystal Lock', hits:0,  xp:0,  wrench:'lock', lock:'world', worth:100},
   SLOCK:  {id:31, name:'Small Lock',   hits:0,  xp:0,  price:40,  wrench:'lock', lock:'small'},
   BLOCK_BG:{id:40,name:'Dinding Gua',  hits:2,  xp:1,  bg:1, price:1},
   BLOCK:  {id:32, name:'Big Lock',     hits:0,  xp:0,  price:120, wrench:'lock', lock:'big'},
   HLOCK:  {id:33, name:'Huge Lock',    hits:0,  xp:0,  price:400, wrench:'lock', lock:'huge'},
-  // farmable: dibeli di toko (500–2000), saat dipecah menjatuhkan gems lebih banyak + seed (30%)
-  FARM1:  {id:50, name:'Semak Permata', hits:3, xp:3,  gem:[1,3],   farm:1},
-  FARM2:  {id:51, name:'Jamur Kristal', hits:4, xp:4,  gem:[2,5],   farm:1},
-  FARM3:  {id:52, name:'Batu Bara Api', hits:5, xp:6,  gem:[3,7],   farm:1},
-  FARM4:  {id:53, name:'Lentera Emas',  hits:6, xp:8,  gem:[5,10],  farm:1, light:1},
-  FARM5:  {id:54, name:'Bunga Pelangi', hits:7, xp:10, gem:[7,14],  farm:1},
+  // farmable (v1.4): gems per block 50–1000 dibagi per jenis, tumbuh lebih lama; dipecah juga memberi seed (30%)
+  FARM1:  {id:50, name:'Semak Permata', hits:3, xp:3,  gem:[50,150],   farm:1},
+  FARM2:  {id:51, name:'Jamur Kristal', hits:4, xp:4,  gem:[100,300],  farm:1},
+  FARM3:  {id:52, name:'Batu Bara Api', hits:5, xp:6,  gem:[200,500],  farm:1},
+  FARM4:  {id:53, name:'Lentera Emas',  hits:6, xp:8,  gem:[350,750],  farm:1, light:1},
+  FARM5:  {id:54, name:'Bunga Pelangi', hits:7, xp:10, gem:[500,1000], farm:1},
+  // block interaktif (v1.4): dipukul = acak angka (dihitung server), dipukul cepat berkali-kali = pecah
+  DICE:   {id:60, name:'Dadu',          hits:4, xp:1,  price:150, roll:'dice'},
+  ROULETTE:{id:61,name:'Roda Roulette', hits:5, xp:1,  price:400, roll:'roulette'},
+  VEND:   {id:62, name:'Vending Machine', hits:5, xp:2, price:500, wrench:'vend'},
   PLANKP: {id:41, name:'Platform Kayu',hits:3,  xp:2,  price:5, platform:1},
   ROCKP:  {id:42, name:'Platform Batu',hits:5,  xp:2,  price:6, platform:1}
 };
@@ -105,12 +112,39 @@ const BY_ID = {}; for (const k in T){ const d = T[k]; BY_ID[d.id] = d;
 // kapasitas lock dalam jumlah tile (menyebar dari lock, seperti Growtopia)
 const LOCK_TILES = {small:10, big:48, huge:200};
 T.TREE.color = '#5fae63';
-const BLOCK_IDS = [1,2,3,4,5,6,9,10,11,16,17,18,20,21,22,41,42];
+const BLOCK_IDS = [1,2,3,4,5,6,9,10,11,16,17,18,20,21,22,41,42,60,61];
 const SEEDABLE  = [1,2,3,4,5,6,9,10,11,15,16,17,18,41,42,50,51,52,53,54];   // lava & farmable juga menjatuhkan seed
 const ORES = [12,13,14];
-const GROW_MS = {1:4000,2:9000,3:7000,4:5000,5:11000,6:14000,9:16000,10:12000,11:24000,16:5000,17:8000,18:6000,41:9000,42:11000,15:15000,50:20000,51:30000,52:42000,53:55000,54:70000};
+const GROW_MS = {1:4000,2:9000,3:7000,4:5000,5:11000,6:14000,9:16000,10:12000,11:24000,16:5000,17:8000,18:6000,41:9000,42:11000,15:15000,
+  50:120000,51:240000,52:420000,53:600000,54:900000};   // farmable v1.4: 2 / 4 / 7 / 10 / 15 menit
 const RECIPES = {'1+2':9,'2+4':10,'5+6':11,'1+16':17,'3+16':41,'2+16':42,'4+18':10,'6+11':14,'2+6':15};
 function recipe(a,b){ return RECIPES[Math.min(a,b)+'+'+Math.max(a,b)]; }
+
+// ===== RARITY (v1.4) =====
+const RARITY = {
+  common:   {name:'Common',    color:'#c9d2de', rank:0},
+  uncommon: {name:'Uncommon',  color:'#5ee07a', rank:1},
+  rare:     {name:'Rare',      color:'#4fb3ff', rank:2},
+  epic:     {name:'Epic',      color:'#c07cff', rank:3},
+  legendary:{name:'Legendary', color:'#ffb02e', rank:4},
+  mythic:   {name:'Mythic',    color:'#ff5a8a', rank:5}
+};
+const RARITY_FIXED = {b7:'mythic', b23:'mythic', b34:'mythic', b30:'legendary', b33:'epic', b32:'rare', b31:'uncommon',
+  b14:'epic', b13:'rare', b12:'uncommon', b11:'rare', b15:'rare', b54:'legendary', s54:'legendary', b53:'epic', s53:'epic',
+  b52:'epic', s52:'epic', b51:'rare', s51:'rare', b50:'uncommon', s50:'uncommon', b61:'rare', b60:'uncommon', b62:'rare', gem:'common'};
+function rarityOf(key){
+  if (RARITY_FIXED[key]) return RARITY_FIXED[key];
+  if (key === FIST || key === WRENCH) return 'common';
+  const w = WEAR[key];
+  if (w) return w.price >= 1500 ? 'legendary' : w.price >= 900 ? 'epic' : w.price >= 300 ? 'rare' : w.price >= 120 ? 'uncommon' : 'common';
+  const k = key[0], id = +key.slice(1), d = BY_ID[id]; if (!d) return 'common';
+  const v = d.price || (d.gem ? d.gem[1] * 3 : 0);
+  // hasil splice (resep) minimal uncommon
+  const spliced = Object.values(RECIPES).includes(id);
+  const r = v >= 1000 ? 'legendary' : v >= 100 ? 'epic' : v >= 25 ? 'rare' : (v >= 6 || spliced) ? 'uncommon' : 'common';
+  return k === 's' && r === 'common' && GROW_MS[id] >= 10000 ? 'uncommon' : r;
+}
+function rarityDef(key){ return RARITY[rarityOf(key)]; }
 
 // --- drop rate (atas permintaan user: block kembali 20–25%, seed 30%) ---
 const DROP_BLOCK = 0.225, DROP_SEED = 0.30, DROP_SEED_BG = 0.35;   // dinding gua: 30–40% seed
@@ -137,7 +171,7 @@ const SHOP = [
    give:[['b9',40],['b17',40],['b5',20],['b6',10]]},
   {key:'farmer',  name:'Farmer Pack',  desc:'5 seed tiap jenis dasar', price:150,
    give:[['s1',5],['s2',5],['s3',5],['s4',5],['s5',5],['s6',5]]},
-  {key:'b30', name:'World Lock',  desc:'Kunci seluruh world jadi milikmu', price:200, give:[['b30',1]]},
+  {key:'b30', name:'World Lock',  desc:'Kunci seluruh world jadi milikmu. 100 World Lock: klik 2x di tas = 1 Crystal Lock', price:1800, give:[['b30',1]]},
   {key:'b31', name:'Small Lock',  desc:'Klaim 10 tile di sekitarnya', price:40,  give:[['b31',1]]},
   {key:'b32', name:'Big Lock',    desc:'Klaim 48 tile', price:120, give:[['b32',1]]},
   {key:'b33', name:'Huge Lock',   desc:'Klaim 200 tile', price:400, give:[['b33',1]]},
@@ -149,15 +183,18 @@ const SHOP = [
   {key:'b41', name:'Platform Kayu x25', desc:'Bisa dilewati dari bawah, dipijak dari atas', price:125, give:[['b41',25]]},
   {key:'b42', name:'Platform Batu x25', desc:'Platform dari batu', price:150, give:[['b42',25]]},
   {key:'bag8', name:'Upgrade Tas +8 slot', desc:'Tambah 8 slot tas', price:'bag', give:[]},
+  {key:'b60', tab:'fun', name:'Dadu',          desc:'Pukul untuk melempar dadu 1–6. Hasilnya dilihat semua orang di world', price:150, give:[['b60',1]]},
+  {key:'b62', name:'Vending Machine', desc:'Jual item ke pemain lain: isi stok, pasang harga, gems masuk ke mesin', price:500, give:[['b62',1]]},
+  {key:'b61', tab:'fun', name:'Roda Roulette', desc:'Pukul untuk memutar roda 0–36 (merah/hitam/hijau). Hasilnya dilihat semua orang', price:400, give:[['b61',1]]},
 ];
 const SLOT_NAME = {wings:'Sayap', hat:'Topi', shirt:'Baju', pants:'Celana', tool:'Alat'};
-// farmable: paket 10 block + 3 seed. Harga > gems yang didapat dari sekali pecah 10 block (tidak ada untung instan);
-// untung datang dari menanam ulang seed-nya.
-const FARM_PACKS = [[50,500],[51,900],[52,1300],[53,1700],[54,2000]];
+// farmable v1.4: paket 3 seed saja (tanpa block), supaya tidak ada untung instan dari membeli lalu langsung memecah.
+// Untung datang dari menanam: tiap pohon memberi 1–3 block, tiap block dipecah memberi gems sesuai rentangnya.
+const FARM_PACKS = [[50,400],[51,900],[52,1800],[53,3000],[54,4500]];
 for (const [id, price] of FARM_PACKS){
   const d = BY_ID[id];
-  SHOP.push({key:'farm'+id, tab:'farm', name:d.name, price, give:[['b'+id,10],['s'+id,3]],
-    desc:'10 block + 3 seed. Dipecah: ' + d.gem[0] + '–' + d.gem[1] + ' gems/block, 30% seed. Tumbuh ' + Math.round(GROW_MS[id]/1000) + ' dtk'});
+  SHOP.push({key:'farm'+id, tab:'farm', name:d.name, price, give:[['s'+id,3]],
+    desc:'3 seed. Tiap block dipecah: ' + d.gem[0] + '–' + d.gem[1] + ' gems, 30% seed. Tumbuh ' + Math.round(GROW_MS[id]/60000) + ' menit'});
 }
 for (const k in WEAR){ const w = WEAR[k];
   SHOP.push({key:k, tab:'wear', name:w.name, desc:(w.desc || SLOT_NAME[w.slot]) + ' · klik di tas untuk pakai', price:w.price, give:[[k,1]]}); }
@@ -325,6 +362,31 @@ function makeTex(id, v){
       px(g,0,0,'#1a1420',16,16); px(g,2,0,P[1],12,16); px(g,3,1,P[0],10,15);
       px(g,3,1,P[2],10,1); px(g,4,3,shadeHex(P[0],-18),8,5); px(g,4,10,shadeHex(P[0],-18),8,5);
       px(g,10,9,'#ffd23d',2,2);
+      break; }
+    case 34: {   // crystal lock: lock kristal biru berkilau
+      px(g,0,0,'#0f3a52',16,16); px(g,1,1,P[1],14,14); bevel(g,P,1);
+      px(g,5,2,'#e8ffff',6,6); g.clearRect(6,3,4,4); px(g,6,3,P[1],4,4);
+      g.fillStyle = P[0]; g.beginPath(); g.moveTo(8,6); g.lineTo(13,10); g.lineTo(8,15); g.lineTo(3,10); g.closePath(); g.fill();
+      g.fillStyle = P[2]; g.beginPath(); g.moveTo(8,6); g.lineTo(10,10); g.lineTo(8,14); g.lineTo(6,10); g.closePath(); g.fill();
+      px(g,7,8,'#ffffff',1,2); px(g,2,2,'#ffffff',1,1); px(g,13,13,'#ffffff',1,1);
+      break; }
+    case 62: {   // vending machine: badan biru, kaca etalase, slot koin
+      px(g,0,0,'#17121c',16,16); px(g,1,1,P[0],14,14); px(g,1,1,P[2],14,1); px(g,1,14,P[1],14,1);
+      px(g,2,2,'#17121c',8,11); px(g,3,3,'#bfe6ff',6,9); px(g,3,3,'#e8f8ff',2,9);
+      for (const y of [5,8,11]) px(g,3,y,'#7aa6c8',6,1);
+      px(g,11,3,'#17121c',3,3); px(g,12,4,'#ffd74a',1,1); px(g,11,8,'#ffd74a',3,1); px(g,11,10,'#ff5a5a',3,1);
+      break; }
+    case 60: {   // dadu: kubus putih dengan titik
+      px(g,0,0,'#17121c',16,16); px(g,1,1,P[0],14,14); px(g,1,1,P[2],14,1); px(g,1,1,P[2],1,14);
+      px(g,1,14,P[1],14,1); px(g,14,1,P[1],1,14);
+      for (const [x,y] of [[4,4],[11,4],[7,7],[4,11],[11,11]]) px(g,x,y,'#d8323c',2,2);
+      break; }
+    case 61: {   // roda roulette: lingkaran merah/hitam + tengah emas
+      px(g,0,0,P[1],16,16);
+      for (let k=0;k<12;k++){ g.fillStyle = k === 0 ? '#2fae4a' : (k % 2 ? '#d8323c' : '#1a1418'); g.beginPath(); g.moveTo(8,8);
+        g.arc(8,8,7,k*Math.PI/6,(k+1)*Math.PI/6); g.closePath(); g.fill(); }
+      g.strokeStyle = P[2]; g.lineWidth = 1; g.beginPath(); g.arc(8,8,7,0,Math.PI*2); g.stroke();
+      px(g,6,6,P[2],4,4); px(g,7,7,'#fff8c8',2,2); px(g,7,0,'#ffffff',2,2);
       break; }
     case 30: case 31: case 32: case 33: {   // lock: badan + gembok
       px(g,0,0,P[1],16,16); px(g,1,1,P[0],14,14); bevel(g,P,1);

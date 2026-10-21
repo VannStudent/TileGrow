@@ -31,7 +31,7 @@ posAt(a, 50, 29); await sleep(60);
 // 2. pesan 'ops' lama (dulu bisa menulis world mentah) ditolak
 drain(a); S(a, {t: 'ops', ops: [[3100, 0, 0, null, null]]}); const er = await wait(a, 'err'); ok("pesan 'ops' lama ditolak", er && /Versi game lama/.test(er.text));
 // 3. A beli + pasang World Lock
-S(a, {t: 'chat', text: '/testgive gem 1000'}); await sleep(100); S(a, {t: 'buy', key: 'b30'}); await sleep(150);
+S(a, {t: 'chat', text: '/testgive gem 2000'}); await sleep(100); S(a, {t: 'buy', key: 'b30'}); await sleep(150);   // v1.4: World Lock 1.800
 drain(a); S(a, {t: 'act', a: 'place', i: at(51, 29), key: 'b30'}); let o = await tileAfter(a, at(51, 29));
 ok('A pasang World Lock', o && o[1] === 30 && o[3] && o[3].lock.owner === 'alice1');
 S(b, {t: 'join', name: 'TEST'}); await wait(b, 'world'); await wait(a, 'pjoin'); posAt(b, 52, 29); await sleep(60);

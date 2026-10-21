@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>TileGrow v1.3</title>
+<title>TileGrow v1.4</title>
 <style>
   :root{ --bg:#0d1017; --line:#2c3447; --text:#eef2f8; --dim:#8d97ab; --accent:#ff9494; --ol:#17121c; }
   *{box-sizing:border-box}
@@ -201,28 +201,68 @@
   .flag{font-size:18px;width:38px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:2px solid var(--ol);background:#141925;cursor:pointer;padding:0}
   .flag.on{box-shadow:0 0 0 2px #ffd400 inset}
   /* world lobby ala Growtopia */
-  .wlobby{width:min(760px,96vw);display:flex;flex-direction:column;gap:8px;padding:16px;border-radius:14px;background:rgba(10,18,34,.86);border:2px solid #4f6f9a;box-shadow:0 10px 30px rgba(0,0,0,.45)}
-  .wlMsg{background:rgba(16,26,44,.85);border:2px solid #4f6f9a;border-radius:10px;padding:8px 12px;font-size:13px;color:#9fd0ff}
-  .wlMsg .s{color:#ffd25e;font-weight:800}
-  .wlHead{font-size:13px;color:#cfe6ff}
-  .wlName{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800;color:#fff;text-shadow:0 2px 0 #000}
-  .wlName input{flex:1;font-size:16px;padding:10px 12px;text-transform:uppercase;background:#d7dde6;color:#17121c;border-color:#17121c}
-  .wlHint{font-size:12px;color:#fff;text-shadow:0 1px 0 #000}
-  .wlFilter{display:flex;align-items:center;gap:6px;font-size:12px;color:#cfe6ff}
-  .lbtab{padding:4px 10px;border-radius:99px;border:2px solid var(--ol);background:#2e3850;color:#cfe6ff;font-size:11px;font-weight:700;cursor:pointer}
-  .lbtab.on{background:#4fa3d9;color:#fff}
-  .wlWorlds{display:flex;flex-wrap:wrap;gap:7px;max-height:42vh;overflow:auto;padding:4px 0}
-  .wlWorlds .empty{font-size:12px;color:#cfe6ff}
-  .wbtn{padding:10px 16px;border-radius:999px;border:3px solid var(--ol);color:#fff;font-weight:800;font-size:13px;cursor:pointer;text-shadow:0 1px 0 #000;box-shadow:0 3px 0 rgba(0,0,0,.4)}
-  .wbtn.hist{background:linear-gradient(180deg,#9a5ce0,#6a2fb0)}
-  .wbtn.own{background:linear-gradient(180deg,#4ac46a,#22803e)}
-  .wbtn.other{background:linear-gradient(180deg,#7b8494,#4f5766)}
-  .wbtn:hover{filter:brightness(1.15);transform:translateY(-1px)}
-  .wlLegend{font-size:11px;color:#cfe6ff;display:flex;align-items:center;gap:6px}
-  .wlLegend i{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid var(--ol)}
-  .wlLegend i.hist{background:#8a4fd0} .wlLegend i.own{background:#3aaa5a} .wlLegend i.other{background:#6a7383}
-  .wlBtns{display:flex;justify-content:space-between;gap:10px;margin-top:4px}
-  .wlBtns .btn{min-width:160px}
+  /* v1.4 vending machine */
+  .vendItem{display:flex;gap:12px;align-items:center;padding:10px;border-radius:10px;background:rgba(0,0,0,.25);border:2px solid #2c4a6e;margin-bottom:6px}
+  .vendItem img{width:44px;height:44px;image-rendering:pixelated}
+  .vendItem .rar{margin-left:8px}
+  .vendRow{display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap}
+  .vendRow input{flex:1;min-width:90px}
+  #dlgBody{scrollbar-width:thin;scrollbar-color:#3b5a86 transparent}
+  #dlgBody::-webkit-scrollbar{width:8px} #dlgBody::-webkit-scrollbar-thumb{background:#3b5a86;border-radius:8px} #dlgBody::-webkit-scrollbar-track{background:transparent}
+  .vendCash{justify-content:space-between;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.2)}
+  #vPick .cell{position:relative} #vPick .cell .n{position:absolute;right:3px;bottom:1px;font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 0 #000}
+  /* ===== world lobby v1.4 ===== */
+  .lobbyScr{background:radial-gradient(ellipse at 50% 30%,rgba(20,40,80,.35),rgba(4,8,18,.78));backdrop-filter:blur(4px)}
+  .wlobby{width:min(720px,95vw);max-height:92vh;display:flex;flex-direction:column;gap:12px;padding:20px 22px 22px;border-radius:18px;
+    background:linear-gradient(180deg,rgba(26,40,68,.97),rgba(14,22,40,.97));border:3px solid var(--ol);
+    box-shadow:0 0 0 2px #3b5a86 inset,0 18px 50px rgba(0,0,0,.55)}
+  .wlTop{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .wlBrand{display:flex;flex-direction:column;line-height:1}
+  .wlLogo{font-size:13px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#7be37a;text-shadow:0 2px 0 #17121c}
+  .wlTitle{font-size:26px;font-weight:900;color:#fff;text-shadow:0 3px 0 #17121c;margin-top:3px}
+  .wlAcct{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;border-radius:99px;background:rgba(0,0,0,.28);border:2px solid #2c4a6e;font-size:14px;color:#e8f0ff}
+  .wlAcct b{font-weight:800}
+  .wlDot{width:9px;height:9px;border-radius:50%;background:#9aa3b5;box-shadow:0 0 0 2px rgba(0,0,0,.35)}
+  .wlDot.on{background:#3fe07a;box-shadow:0 0 0 2px rgba(0,0,0,.35),0 0 8px #3fe07a}
+  .wlLogout{margin-left:4px;padding:4px 10px;border-radius:99px;border:2px solid #4a5a78;background:transparent;color:#b8c6dc;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+  .wlLogout:hover{background:#5a2a34;border-color:#a8323c;color:#fff}
+  .wlMsg{font-size:14px;color:#b8cbe6;line-height:1.4}
+  .wlMsg .s{display:none}
+  .wlSearch{display:flex;align-items:stretch;border-radius:14px;border:3px solid var(--ol);background:#0b1220;box-shadow:0 0 0 2px #2c4a6e inset;overflow:hidden}
+  .wlSearch:focus-within{border-color:#4fb3ff;box-shadow:0 0 0 2px #4fb3ff inset,0 0 14px rgba(79,179,255,.35)}
+  .wlIc{display:flex;align-items:center;padding:0 4px 0 14px;font-size:20px}
+  .wlSearch input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#fff;font-size:17px;font-weight:700;letter-spacing:1px;padding:14px 10px;text-transform:uppercase}
+  .wlSearch input::placeholder{color:#5f708c;font-weight:600;letter-spacing:0;text-transform:none;font-size:15px}
+  .wlGo{border:0;border-left:3px solid var(--ol);padding:0 22px;font:inherit;font-size:16px;font-weight:900;color:#fff;cursor:pointer;text-shadow:0 2px 0 rgba(0,0,0,.4);
+    background:linear-gradient(180deg,#5ad87a,#22914a);white-space:nowrap}
+  .wlGo:hover{filter:brightness(1.1)} .wlGo:active{filter:brightness(.92)}
+  .wlHint{font-size:13px;color:#b8cbe6;margin-top:-4px;min-height:16px}
+  .wlHint a{color:#ffd25e;font-weight:800}
+  .wlobby .err{margin-top:-8px}
+  .wlFilter{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;border-top:2px solid rgba(79,111,154,.35);padding-top:12px}
+  .wlSec{font-size:13px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#cfe0f5}
+  .wlTabs{display:flex;gap:4px;padding:3px;border-radius:99px;background:rgba(0,0,0,.3);border:2px solid #2c4a6e}
+  .lbtab{padding:6px 14px;border-radius:99px;border:0;background:transparent;color:#9fb3d1;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+  .lbtab:hover{color:#fff}
+  .lbtab.on{background:#4fb3ff;color:#0b1220}
+  .wlWorlds{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:44vh;overflow-y:auto;overflow-x:hidden;padding:4px 2px 8px;margin:0 -2px;scrollbar-width:thin;scrollbar-color:#3b5a86 transparent}
+  .wlWorlds::-webkit-scrollbar{width:8px} .wlWorlds::-webkit-scrollbar-thumb{background:#3b5a86;border-radius:8px} .wlWorlds::-webkit-scrollbar-track{background:transparent}
+  .wlWorlds .empty{grid-column:1/-1;padding:22px;text-align:center;font-size:14px;color:#9fb3d1;border:2px dashed #2c4a6e;border-radius:12px}
+  .wbtn{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px 12px 10px;border-radius:12px;border:3px solid var(--ol);
+    background:linear-gradient(180deg,#2b4566,#1d3150);box-shadow:0 0 0 2px rgba(255,255,255,.06) inset,0 4px 0 rgba(0,0,0,.35);color:#fff;font:inherit;cursor:pointer;text-align:left;
+    transition:transform .08s ease,filter .08s ease}
+  .wbtn:hover{transform:translateY(-2px);filter:brightness(1.12)}
+  .wbtn.sel{box-shadow:0 0 0 2px #ffd400 inset,0 0 12px rgba(255,212,0,.45),0 4px 0 rgba(0,0,0,.35)}
+  .wbtn .wTop{display:flex;align-items:center;gap:8px;width:100%}
+  .wbtn .wArt{width:30px;height:30px;border-radius:7px;border:2px solid var(--ol);flex:none;background-size:cover;image-rendering:pixelated}
+  .wbtn .wName{font-size:14px;font-weight:900;letter-spacing:.5px;text-shadow:0 2px 0 rgba(0,0,0,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wbtn .wMeta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:#d6e2f3}
+  .wbtn .wBadge{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.4px;border:1px solid rgba(0,0,0,.4)}
+  .wbtn.own{background:linear-gradient(180deg,#2f7a48,#1c4d2e)} .wbtn.own .wBadge{background:#5dff6a;color:#0b2a12}
+  .wbtn.hist{background:linear-gradient(180deg,#4a3680,#2d2050)} .wbtn.hist .wBadge{background:#c9a8ff;color:#22104a}
+  .wbtn.other .wBadge{background:#9aa3b5;color:#141925}
+  .wbtn .wOn{color:#7be37a;font-weight:800}
+  @media (max-width:520px){ .wlTitle{font-size:21px} .wlGo{padding:0 14px;font-size:14px} .wlSearch input{font-size:16px;padding:12px 8px} .wlWorlds{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))} }
   /* layar judul / akun / lobby */
   #stage.menuMode .tl, #stage.menuMode #fps, #stage.menuMode .rstack, #stage.menuMode .inv, #stage.menuMode .chatbox, #stage.menuMode #touchUI{display:none}
   .screen{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,10,20,.6);backdrop-filter:blur(3px)}
@@ -467,6 +507,24 @@
   .tri[data-k]{cursor:pointer} .tri[data-k]:hover{background:#3a2430}
   #trBag{max-height:130px;overflow:auto}
   .roleMod{color:#c07cff} .roleDev{color:#ff9a2e}
+  .scard .rar{position:absolute;left:4px;top:4px;font-size:8px;font-weight:800;color:#17121c;border-radius:5px;padding:0 4px;border:1px solid var(--ol);text-transform:uppercase}
+  /* v1.4: rarity + info item */
+  /* rarity: strip warna di bawah slot + cahaya lembut di belakang ikon (bingkai tetap, supaya item terpilih tetap jelas) */
+  .cell.rar{overflow:hidden}
+  .cell.rar::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--rc) 42%,transparent),transparent 68%);pointer-events:none}
+  .cell.rar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--rc);box-shadow:0 -1px 0 rgba(0,0,0,.45);pointer-events:none}
+  .cell.rar img{position:relative}
+  .cell.rar .n{z-index:1;bottom:5px}
+  .btn.info{background:linear-gradient(180deg,#4fb3ff,#2a6fc0)}
+  .iinfo .iiHead{display:flex;gap:12px;align-items:center;margin-bottom:6px}
+  .iinfo .iiArt{width:64px;height:64px;border-radius:12px;border:3px solid var(--ol);background:radial-gradient(circle,#2b4566,#141925);display:flex;align-items:center;justify-content:center;flex:none}
+  .iinfo .iiArt img{width:48px;height:48px;image-rendering:pixelated}
+  .iinfo h2{margin:0 0 4px}
+  .iiRar{display:inline-block;padding:1px 9px;border-radius:99px;border:2px solid var(--ol);color:#17121c;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+  .iiDesc{margin:4px 0 8px;font-size:13px;line-height:1.45;color:#dfe8f6}
+  .iiFacts{display:grid;gap:4px;margin-bottom:10px}
+  .iiFacts div{display:flex;justify-content:space-between;gap:10px;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.06);font-size:12px}
+  .iiFacts span{color:#9fb3d1} .iiFacts b{text-align:right}
 </style>
 </head>
 <body>
@@ -502,6 +560,7 @@
       <div class="invBar">
         <span class="nm" id="selnm">Tinju</span><span class="sub">Tas <b id="cap"></b> · klik item = pegang · pakaian: klik untuk pakai</span>
         <input type="number" id="qty" min="1" value="1">
+        <button class="btn info" id="binfo" title="Lihat info item yang dipilih">Info</button>
         <button class="btn" id="bdrop">Drop</button>
         <button class="btn warn" id="btrash">Buang</button>
       </div>
@@ -577,6 +636,14 @@
     <div class="info" style="justify-content:flex-end"><button class="btn x">Batal</button><button class="btn warn" id="drOk">Drop</button></div>
   </div></div>
 
+  <div class="modal hidden" id="itemInfoM"><div class="win card iinfo" style="width:min(400px,94vw)">
+    <div class="iiHead"><div class="iiArt"><img id="iiIcon" alt=""></div>
+      <div><h2 id="iiName">Item</h2><span class="iiRar" id="iiRar">Common</span> <span class="note" id="iiCount"></span></div></div>
+    <p class="iiDesc" id="iiDesc"></p>
+    <div class="iiFacts" id="iiFacts"></div>
+    <div class="info" id="iiActs" style="justify-content:flex-end;flex-wrap:wrap"></div>
+  </div></div>
+
   <div class="modal hidden" id="exitM"><div class="win card" style="width:min(360px,94vw)">
     <h2>🚪 Keluar dari world <span id="exName"></span>?</h2>
     <p class="note">Progres world ini tersimpan. Kamu akan kembali ke world lobby.</p>
@@ -634,7 +701,7 @@
   </div></div>
   <!-- layar judul -->
   <div class="screen" id="scr-title"><div class="sbox card">
-    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice · v1.3.1</small></div>
+    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice · v1.4</small></div>
     <button class="btn primary big" id="tOnline">🌐 Main Online (WiFi/LAN)</button>
     <button class="btn big" id="tPlay">Main Offline</button>
     <button class="btn big" id="tOptions">Opsi</button>
@@ -675,16 +742,21 @@
   </form></div>
 
   <!-- lobby -->
-  <div class="screen hidden" id="scr-lobby"><div class="wlobby">
+  <div class="screen hidden lobbyScr" id="scr-lobby"><div class="wlobby">
+    <div class="wlTop">
+      <div class="wlBrand"><span class="wlLogo">TileGrow</span><span class="wlTitle">Pilih World</span></div>
+      <div class="wlAcct"><span id="lbFlag"></span><b id="lbUser"></b><i class="wlDot" id="lbDot"></i><button class="wlLogout" id="lbBack" type="button">Logout</button></div>
+    </div>
     <div class="wlMsg" id="lbMsg"></div>
-    <div class="wlHead"><span id="lbFlag"></span> <b id="lbUser"></b></div>
-    <form id="lbForm" class="wlName"><span>Nama World:</span><input id="lbWorld" maxlength="16" placeholder="contoh: KEBUNKU" autocomplete="off"></form>
+    <form id="lbForm" class="wlSearch" autocomplete="off">
+      <span class="wlIc"><svg width="20" height="20" viewBox="0 0 16 16" shape-rendering="crispEdges"><rect x="1" y="1" width="9" height="9" fill="#17121c"/><rect x="2" y="2" width="7" height="7" fill="#4fb3ff"/><rect x="3" y="3" width="2" height="2" fill="#d8f0ff"/><rect x="9" y="9" width="2" height="2" fill="#17121c"/><rect x="11" y="11" width="4" height="4" fill="#17121c"/><rect x="11" y="11" width="3" height="3" fill="#c99a3c"/></svg></span>
+      <input id="lbWorld" maxlength="16" placeholder="Ketik nama world, contoh: KEBUNKU" autocomplete="off" spellcheck="false">
+      <button class="wlGo" id="lbEnter" type="button">Masuk World</button>
+    </form>
     <div class="wlHint" id="lbHint"></div><div class="err" id="lbErr"></div>
-    <div class="wlFilter">Menampilkan: <b id="lbFilterName">Semua World</b>
-      <button class="lbtab" data-f="semua">Semua</button><button class="lbtab" data-f="riwayat">Riwayat</button><button class="lbtab" data-f="milikku">Milikku</button></div>
+    <div class="wlFilter"><span class="wlSec" id="lbFilterName">Semua World</span>
+      <div class="wlTabs"><button class="lbtab" data-f="semua" type="button">Semua</button><button class="lbtab" data-f="riwayat" type="button">Riwayat</button><button class="lbtab" data-f="milikku" type="button">Milikku</button></div></div>
     <div class="wlWorlds" id="lbWorlds"></div>
-    <div class="wlLegend"><i class="hist"></i> pernah dikunjungi <i class="own"></i> milikku (World Lock) <i class="other"></i> lainnya</div>
-    <div class="wlBtns"><button class="btn big" id="lbBack" type="button">Logout</button><button class="btn primary big" id="lbEnter" type="button">Masuk World</button></div>
   </div></div>
 
   <!-- pilih kontrol -->
@@ -731,7 +803,7 @@
     d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#141c2c;color:#e8f0ff;font:16px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:20px';
     d.innerHTML = '<div style="max-width:520px;line-height:1.5"><h2 style="margin:0 0 10px">Game tidak bisa dimuat</h2>' +
       '<p>File ini butuh folder <b>js</b> di sebelahnya. Kemungkinan file dibuka langsung dari dalam ZIP atau dikirim sendirian.</p>' +
-      '<p><b>Mau main sendiri (offline)?</b> Pakai file <b>tilegrow-v1.3.1-offline.html</b>. File itu bisa dibuka sendirian.</p>' +
+      '<p><b>Mau main sendiri (offline)?</b> Pakai file <b>tilegrow-v1.4-offline.html</b>. File itu bisa dibuka sendirian.</p>' +
       '<p><b>Mau main bareng (online)?</b> Jangan buka file ini. Minta alamat dari jendela server, misalnya <b>http://192.168.1.10:8080</b>, lalu buka alamat itu di browser.</p></div>';
     document.body.appendChild(d);
   }

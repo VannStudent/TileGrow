@@ -196,6 +196,20 @@ function act(){
   return placeBlock(tx,ty,d);
 }
 function denied(){ toast('Area ini dikunci. Kamu tidak punya akses.'); sfx('deny'); }
+// ---------- v1.4: Dadu & Roulette ----------
+const ROLL_BUSY_MS = 1400, ROLL_SHOW_MS = 4500;
+const rollFx = new Map();     // index tile -> {kind, v, t, by}
+const ROULETTE_RED = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+function rollValue(kind){ return kind === 'dice' ? 1 + (Math.random()*6|0) : (Math.random()*37|0); }
+function rouletteColor(v){ return v === 0 ? 'hijau' : ROULETTE_RED.has(v) ? 'merah' : 'hitam'; }
+function showRoll(i, kind, v, by){
+  rollFx.set(i, {kind, v, t: Date.now(), by}); sfx('hit');
+  setTimeout(()=>{
+    const f = rollFx.get(i); if (!f || f.v !== v) return;
+    say('act', kind === 'dice' ? '🎲 ' + by + ' melempar dadu: ' + v : '🎡 ' + by + ' memutar roulette: ' + v + ' (' + rouletteColor(v) + ')');
+    sfx('gem');
+  }, ROLL_BUSY_MS - 200);
+}
 
 function placeBlock(tx,ty,d){
   const def = BY_ID[d.id], i = idx(tx,ty);
@@ -237,6 +251,7 @@ function placeBlock(tx,ty,d){
   if (def.wrench === 'sign')    meta.set(i, {sign:{text:''}});
   if (def.wrench === 'door')    meta.set(i, {door:{name:'', locked:false}});
   if (def.wrench === 'display') meta.set(i, {display:{key:null}});
+  if (def.wrench === 'vend')    meta.set(i, {vend:{owner:who(), key:null, n:0, price:0, earned:0}});
   netTouch(i); stat('placed',1); questEvent('place',null,1);
 }
 
@@ -269,11 +284,20 @@ function punch(tx,ty){
     return hitTile(tx,ty,bgw[i],true);
   }
   if (id === 7 || id === 23) return toast(id === 7 ? 'Block dasar tidak bisa dipecah.' : 'Pintu utama tidak bisa dipecah.');
+  // v1.4: Dadu / Roulette. Pukul sekali = acak angka (siapa pun boleh). Pukul lagi selagi masih berputar = merusak (butuh akses).
+  if (BY_ID[id].roll){
+    const fx = rollFx.get(i), busy = fx && Date.now() - fx.t < ROLL_BUSY_MS;
+    if (!busy){
+      if (online()){ sfx('hit'); return netAct('hit', i); }
+      return showRoll(i, BY_ID[id].roll, rollValue(BY_ID[id].roll), who());
+    }
+  }
   if (!canBuild(tx,ty)) return denied();
   if (online()){
     // efek pukulan di layar; server menghitung jumlah pukulan, drop, dan XP
     const m0 = meta.get(i);
     if (m0 && m0.lock && m0.lock.owner !== who()) return denied();
+    if (m0 && m0.vend && (m0.vend.n || m0.vend.earned)) return toast(m0.vend.owner === who() ? 'Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.' : 'Pakai kunci inggris untuk membeli dari Vending Machine.');
     if (id === 8){ const tr = trees.get(i); if (tr && Date.now() - tr.t0 < GROW_MS[tr.kind]) return toast('Pohon belum siap dipanen.'); }
     const k = 'f' + i, dd = dmg.get(k) || {n:0, x:tx, y:ty, bg:false}; dd.n++; dd.t = Date.now(); dmg.set(k, dd);
     puff(tx,ty,id,3); sfx('hit'); shake(1.5);
@@ -281,6 +305,7 @@ function punch(tx,ty){
   }
   const m = meta.get(i);
   if (m && m.lock && m.lock.owner !== who()) return denied();
+  if (m && m.vend && (m.vend.n || m.vend.earned)) return toast('Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.');
   if (m && m.display && m.display.key){             // ambil item dari kotak pajang dulu
     const k = m.display.key; m.display.key = null; netTouch(i); spawnDrop(tx,ty,k,1); return toast('Item diambil dari Kotak Pajang.');
   }
@@ -318,7 +343,10 @@ function hitTile(tx,ty,id,isBg){
     if (Math.random() < DROP_BLOCK) spawnDrop(tx,ty,'b'+id,1);
     if (SEEDABLE.includes(id) && Math.random() < DROP_SEED) spawnDrop(tx,ty,'s'+id,1);
   }
-  if (def.gem){ const g = def.gem[0] + (Math.random()*(def.gem[1]-def.gem[0]+1)|0); for (let k=0;k<g;k++) spawnDrop(tx,ty,'gem',1); stat('ores',1); questEvent('ore',null,1); }
+  if (def.gem){ const g = def.gem[0] + (Math.random()*(def.gem[1]-def.gem[0]+1)|0);
+    if (g <= 12) for (let k=0;k<g;k++) spawnDrop(tx,ty,'gem',1);
+    else { const parts = 4, base = Math.floor(g / parts); for (let k=0;k<parts;k++) spawnDrop(tx,ty,'gem', k === parts-1 ? g - base*(parts-1) : base); }
+    if (!def.farm){ stat('ores',1); questEvent('ore',null,1); } }
   else if (!isBg && Math.random() < GEM_FROM_BLOCK) spawnDrop(tx,ty,'gem',1);
   stat('broken',1); questEvent('break',null,1); addXP(def.xp || 1);
 }
@@ -418,6 +446,7 @@ function wrenchAt(tx,ty){
     if (m.lock.owner !== who()) return toast('Lock milik ' + m.lock.owner + '. Hanya pemilik yang bisa mengatur.');
     return openDialog('lock', {tx,ty,i});
   }
+  if (def.wrench === 'vend') return openVend(i);     // v1.4: siapa pun boleh membuka (untuk membeli)
   if (!canBuild(tx,ty)) return denied();
   openDialog(def.wrench, {tx,ty,i});
 }

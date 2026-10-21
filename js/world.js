@@ -293,6 +293,24 @@ function takeItem(key, n){
   }
   refreshUI(); return k;
 }
+// v1.4: 100 World Lock <-> 1 Crystal Lock (klik 2x di tas). Hasil: pesan error, atau null kalau berhasil.
+const LOCK_RATE = 100;
+function convertLocks(key){
+  if (key === 'b30'){
+    if (countOf('b30') < LOCK_RATE) return 'Butuh ' + LOCK_RATE + ' World Lock untuk 1 Crystal Lock (punya ' + countOf('b30') + ').';
+    if (canAdd('b34', 1) < 1 && countOf('b30') > LOCK_RATE) return 'Tas penuh.';
+    takeItem('b30', LOCK_RATE); addItem('b34', 1);
+    say('act', LOCK_RATE + ' World Lock digabung menjadi 1 Crystal Lock.'); return null;
+  }
+  if (key === 'b34'){
+    if (countOf('b34') < 1) return 'Kamu tidak punya Crystal Lock.';
+    if (countOf('b30') + LOCK_RATE > STACK) return 'Stack World Lock akan lewat ' + STACK + '. Kurangi World Lock dulu.';
+    if (!countOf('b30') && bag.length >= bagSlots && countOf('b34') > 1) return 'Tas penuh.';
+    takeItem('b34', 1); addItem('b30', LOCK_RATE);
+    say('act', '1 Crystal Lock dipecah menjadi ' + LOCK_RATE + ' World Lock.'); return null;
+  }
+  return 'Item ini tidak bisa ditukar.';
+}
 function selected(){ return bag.find(s => s.key === selKey) || bag.find(s => s.key === FIST) || bag[0]; }
 function select(key){ selKey = key; refreshUI(); }
 // hotbar ala Growtopia: memilih item dari tas memasukkannya ke hotbar (paling kiri setelah slot 0)

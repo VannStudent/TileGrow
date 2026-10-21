@@ -107,7 +107,8 @@ function drawPickaxe(g, x, y, s, w){
   g.fillStyle = w.color[2]; g.fillRect(-4,-7,6,1);
   g.restore();
 }
-const ICON = {};
+const ICON = {}, ICON_IMG = {};
+function iconImg(key){ if (ICON_IMG[key]) return ICON_IMG[key]; const im = new Image(); im.src = icon(key); return ICON_IMG[key] = im; }
 function icon(key){
   if (ICON[key]) return ICON[key];
   const c = newCanvas(32), g = c.getContext('2d'), d = itemDef(key);
@@ -191,6 +192,7 @@ function drawTree(sx, sy, tr, now){
 
 // karakter: desain asli ~50px lalu diskalakan supaya muat 1x1 block
 const PS = 0.58;
+const ACCESS_GREEN = '#b8ffb0';
 function drawPlayer(rx, ry){
   const now = Date.now(), f = pl.face, x = rx + pl.w/2, ground = ry + pl.h;
   if (pl.dead > 0){
@@ -301,12 +303,14 @@ function drawPlayer(rx, ry){
   if (settings.showNames){
     // pemilik World Lock: nama hijau (seperti Growtopia)
     // nama: Moderator = @ ungu, Developer = @ oranye (berlaku untuk diri sendiri & pemain lain); pemilik World Lock hijau
-    const wl = worldLock(), owner = wl && wl.lock.owner === (NAME_OVERRIDE ? playerName : who());
+    const wl = worldLock(), nmKey = NAME_OVERRIDE ? playerName : who(), owner = wl && wl.lock.owner === nmKey;
+    // v1.4: pemain yang diberi akses oleh pemilik World Lock: nama hijau muda
+    const hasAcc = !owner && wl && (wl.lock.access || []).some(a => String(a).toLowerCase() === String(nmKey).toLowerCase());
     ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center';
     const mine = !NAME_OVERRIDE && online(), rc = NAME_OVERRIDE ? NAME_OVERRIDE.color : (mine ? roleColor(net.role) : null);
     const nm = NAME_OVERRIDE ? NAME_OVERRIDE.text : (mine ? net.display || who() : who()), nw = ctx.measureText(nm).width;
     ctx.lineWidth = 3; ctx.strokeStyle = OL; ctx.strokeText(nm, x + 6, ry - 6);
-    ctx.fillStyle = rc || (owner ? '#5dff6a' : guest ? '#9fd6ee' : '#ffffff'); ctx.fillText(nm, x + 6, ry - 6);
+    ctx.fillStyle = rc || (owner ? '#5dff6a' : hasAcc ? ACCESS_GREEN : guest ? '#9fd6ee' : '#ffffff'); ctx.fillText(nm, x + 6, ry - 6);
     if (typeof flagImg === 'function') ctx.drawImage(flagImg(playerFlag), x + 6 - nw/2 - 15, ry - 13, 12, 8);
     ctx.textAlign = 'left';
   }
@@ -488,6 +492,9 @@ function draw(alpha){
       if (d.kind === 'seed') drawSeed(ctx, sx+TS/2, sy+TS/2, 1, BY_ID[d.id].color);
       else if (d.kind === 'block') ctx.drawImage(TEX[d.id], sx+9, sy+9, TS-18, TS-18);
       else if (d.kind === 'wrench') drawWrench(ctx, sx+TS/2, sy+TS/2, .8); } }
+    if (id === 62){ const m = meta.get(i); if (m && m.vend && m.vend.key){        // v1.4: barang jualan terlihat di kaca mesin
+      ctx.drawImage(iconImg(m.vend.key), sx+6, sy+6, 14, 14);
+      if (!m.vend.n){ ctx.fillStyle = 'rgba(20,10,20,.55)'; ctx.fillRect(sx+6, sy+6, 14, 14); } } }
   }
   // cahaya
   for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++){
@@ -516,6 +523,19 @@ function draw(alpha){
       ctx.fillStyle = m.lock.owner === who() ? 'rgba(138,210,240,.22)' : 'rgba(255,110,110,.22)';
       for (const t of lockTilesOf(m)) ctx.fillRect((t % COLS)*TS, ((t / COLS)|0)*TS, TS, TS);
     }
+  }
+  // v1.4: hasil Dadu / Roulette di atas block (angka berputar dulu, lalu angka akhir)
+  for (const [i, f] of rollFx){
+    const age = now - f.t; if (age > ROLL_SHOW_MS || fg[i] !== (f.kind === 'dice' ? 60 : 61)){ if (age > ROLL_SHOW_MS) rollFx.delete(i); continue; }
+    const x = (i % COLS)*TS + TS/2, y = ((i / COLS)|0)*TS - 10 - Math.min(1, age/200)*6;
+    const spinning = age < ROLL_BUSY_MS - 200;
+    const v = spinning ? (f.kind === 'dice' ? 1 + ((age/70)|0) % 6 : ((age/45)|0) % 37) : f.v;
+    const col = f.kind === 'dice' ? '#ffffff' : v === 0 ? '#3fe07a' : ROULETTE_RED.has(v) ? '#ff5a5a' : '#c9d2de';
+    ctx.save(); ctx.globalAlpha = Math.min(1, (ROLL_SHOW_MS - age)/400);
+    const w = 26, h = 20; ctx.fillStyle = OL; ctx.fillRect(x - w/2 - 2, y - h/2 - 2, w + 4, h + 4);
+    ctx.fillStyle = spinning ? '#2b4566' : '#1d3150'; ctx.fillRect(x - w/2, y - h/2, w, h);
+    ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col; ctx.fillText(String(v), x, y + 1);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'; ctx.restore();
   }
   // label pintu utama naik ke atas nama pemain kalau pemain berdiri di pintu
   const md = spawn, onDoor = Math.abs((pl.x + pl.w/2) - (md.x*TS + TS/2)) < TS && Math.abs(pl.y - md.y*TS) < TS;

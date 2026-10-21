@@ -17,7 +17,7 @@ const {loadEcon} = require('./econ');
 const {createSocial, RANK} = require('./social');
 
 const PORT = +process.env.PORT || 8080;
-const VERSION = 'v1.3.1';
+const VERSION = 'v1.4';
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = path.resolve(__dirname, '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
@@ -75,10 +75,10 @@ function validWorldData(d){
     && Array.isArray(d.trees) && Array.isArray(d.meta) && d.spawn && Number.isInteger(d.spawn.x) && Number.isInteger(d.spawn.y);
 }
 // v1.0.1: id block yang dikenal (sama dengan data.js). Block lain ditolak.
-const FG_IDS = new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,30,31,32,33,41,42,50,51,52,53,54]);
+const FG_IDS = new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,30,31,32,33,34,41,42,50,51,52,53,54,60,61,62]);
 const BG_IDS = new Set([0,40]);
 const PROTECTED = new Set([7, 23]);                    // Dasar & Pintu Utama: tidak bisa dipasang / dihapus pemain
-const LOCK_TYPE = {30: 'world', 31: 'small', 32: 'big', 33: 'huge'};
+const LOCK_TYPE = {30: 'world', 31: 'small', 32: 'big', 33: 'huge', 34: 'world'};
 const LOCK_TILES = {small: 10, big: 48, huge: 200}, LOCK_RADIUS = {small: 6, big: 10, huge: 18};
 // jenis pohon: semua seed (SEEDABLE di data.js) + hasil splice (RECIPES), termasuk Bijih Pirus (14)
 const SEED_KINDS = new Set([1,2,3,4,5,6,9,10,11,14,15,16,17,18,41,42,50,51,52,53,54]);
@@ -86,13 +86,16 @@ const isName = v => typeof v === 'string' && /^[A-Za-z0-9]{1,16}$/.test(v);
 const isStr = (v, n) => typeof v === 'string' && v.length <= n;
 // bentuk meta harus cocok dengan block-nya; kalau tidak, data bisa membuat game pemain lain error
 function validMeta(f, i, mt){
-  const need = LOCK_TYPE[f] ? 'lock' : f === 20 ? 'sign' : f === 21 ? 'door' : f === 22 ? 'display' : null;
+  const need = LOCK_TYPE[f] ? 'lock' : f === 20 ? 'sign' : f === 21 ? 'door' : f === 22 ? 'display' : f === 62 ? 'vend' : null;
   if (!need) return mt === null || mt === undefined;
   if (!mt || typeof mt !== 'object' || Object.keys(mt).length !== 1 || !mt[need] || typeof mt[need] !== 'object') return false;
   const v = mt[need];
   if (need === 'sign') return isStr(v.text, 120);
   if (need === 'door') return isStr(v.name, 24) && typeof v.locked === 'boolean';
   if (need === 'display') return v.key === null || (isStr(v.key, 24) && /^[a-z0-9_]+$/i.test(v.key));
+  if (need === 'vend') return isName(v.owner) && (v.key === null || (econ.isKey(v.key) && v.key !== D.FIST && v.key !== D.WRENCH))
+    && Number.isInteger(v.n) && v.n >= 0 && v.n <= D.STACK && Number.isInteger(v.price) && v.price >= 0 && v.price <= VEND_PRICE_MAX
+    && Number.isInteger(v.earned) && v.earned >= 0 && (v.key !== null || v.n === 0);
   // lock
   if (v.type !== LOCK_TYPE[f] || !isName(v.owner) || !Array.isArray(v.access) || v.access.length > 50 || !v.access.every(a => isStr(a, 16))
       || typeof v.public !== 'boolean' || (v.ignoreAir !== undefined && typeof v.ignoreAir !== 'boolean')) return false;
@@ -417,8 +420,20 @@ function handleAct(c, m){
     const id = isBg ? d.bgw[i] : fgId;
     if (!id) return;
     if (PROTECTED.has(id)) return;
+    // v1.4: Dadu / Roulette: pukulan pertama = acak angka (dihitung di sini, siapa pun boleh); pukul lagi saat masih berputar = merusak
+    const rd = !isBg && D.BY_ID[id];
+    if (rd && rd.roll){
+      const rk = c.world + ':' + i, last = rollS.get(rk) || 0;
+      if (Date.now() - last >= ROLL_BUSY_MS){
+        rollS.set(rk, Date.now());
+        const v = rd.roll === 'dice' ? 1 + crypto.randomInt(6) : crypto.randomInt(37);
+        return broadcast(c.world, {t: 'roll', i, kind: rd.roll, v, by: social.display(u)});
+      }
+    }
     if (!can) return deny(c, w, i, 'Area ini dikunci.');
     if (om && om.lock && om.lock.owner !== u) return deny(c, w, i, 'Lock milik ' + om.lock.owner + '.');
+    if (om && om.vend && (om.vend.n || om.vend.earned))
+      return deny(c, w, i, om.vend.owner === u ? 'Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.' : 'Vending Machine milik ' + om.vend.owner + '. Pakai kunci inggris untuk membeli.');
     if (om && om.display && om.display.key){
       const k = om.display.key; applyTile(w, i, fgId, d.bgw[i], {display: {key: null}}, null); dropsAt(w, tx, ty, [[k, 1]]); return;
     }
@@ -488,6 +503,7 @@ function handleAct(c, m){
     else if (def.wrench === 'sign') mt = {sign: {text: ''}};
     else if (def.wrench === 'door') mt = {door: {name: '', locked: false}};
     else if (def.wrench === 'display') mt = {display: {key: null}};
+    else if (def.wrench === 'vend') mt = {vend: {owner: u, key: null, n: 0, price: 0, earned: 0}};
     econ.run(E, g => { g.takeItem(key, 1); g.stat('placed', 1); g.questEvent('place', null, 1); if (def.lock === 'world') g.stat('worldLocks', 1); });
     applyTile(w, i, id, d.bgw[i], mt, null);
     saveEcon(u); return pushEcon(c);
@@ -495,6 +511,7 @@ function handleAct(c, m){
   if (m.a === 'meta'){
     // simpan dialog wrench (papan, pintu, kotak pajang, lock)
     const mt = m.meta; if (!om || !mt || typeof mt !== 'object') return;
+    if (om.vend) return deny(c, w, i, '');               // vending diatur lewat aksi 'vend' (stok & gems dihitung server)
     if (!validMeta(fgId, i, mt)) return deny(c, w, i, 'Data tidak valid.');
     if (om.lock){
       if (om.lock.owner !== u) return deny(c, w, i, 'Hanya pemilik lock.');
@@ -513,6 +530,69 @@ function handleAct(c, m){
       }
     }
     return applyTile(w, i, fgId, d.bgw[i], mt, null);
+  }
+}
+const rollS = new Map(), ROLL_BUSY_MS = 1400;
+// ---------- v1.4: Vending Machine ----------
+// stok disimpan di mesin; pembeli bayar gems, gems masuk ke kas mesin sampai diambil pemilik.
+// Semua dihitung di sini, jadi browser tidak bisa memalsukan stok, harga, atau kas.
+const VEND_PRICE_MAX = 100000;
+function handleVend(c, m){
+  const w = worlds.get(c.world); if (!w || c.frozen) return;
+  const i = m.i; if (!Number.isInteger(i) || i < 0 || i >= N) return;
+  const d = w.data, om = new Map(d.meta).get(i);
+  if (d.fg[i] !== 62 || !om || !om.vend) return;
+  const tx = i % COLS, ty = (i / COLS) | 0;
+  if (!inReachS(c, tx, ty)) return deny(c, w, i, 'Terlalu jauh dari Vending Machine.');
+  if (social.inTrade(c.user)) return deny(c, w, i, 'Selesaikan trade dulu.');
+  const u = c.user, E = econOf(u), V = {...om.vend}, mine = V.owner === u;
+  const nm = k => D.itemDef(k).name, fmt = n => n.toLocaleString('id-ID');
+  const done = (msg, push = true) => { applyTile(w, i, 62, d.bgw[i], {vend: V}, null); saveEcon(u); if (push) pushEcon(c, msg ? [['act', msg]] : []); };
+  const n = m.n === undefined ? 1 : m.n;
+  if (m.op === 'buy'){
+    if (mine) return deny(c, w, i, 'Ini mesinmu sendiri.');
+    if (!V.key || V.n < 1) return deny(c, w, i, 'Stok habis.');
+    if (V.price < 1) return deny(c, w, i, 'Pemilik belum memasang harga.');
+    if (m.key !== V.key || m.price !== V.price) return deny(c, w, i, 'Harga atau barang baru saja diganti pemilik. Cek lagi.');
+    if (!Number.isInteger(n) || n < 1 || n > V.n) return deny(c, w, i, 'Jumlah tidak valid (stok ' + V.n + ').');
+    const total = V.price * n;
+    if (E.gems < total) return deny(c, w, i, 'Gems tidak cukup (butuh ' + fmt(total) + ').');
+    const err = econ.fits(E, [[V.key, n]]); if (err) return deny(c, w, i, err);
+    econ.run(E, g => { g.addGems(-total); g.addItem(V.key, n); });
+    V.n -= n; V.earned += total; const key = V.key;   // barang tetap tercatat saat habis, supaya pemilik tahu apa yang perlu diisi
+    done('Kamu membeli ' + n + ' ' + nm(key) + ' seharga ' + fmt(total) + ' gems.');
+    const oc = findOnline(V.owner);
+    if (oc) oc.send({t: 'note', text: social.display(u) + ' membeli ' + n + ' ' + nm(key) + ' dari Vending Machine-mu (' + fmt(total) + ' gems).'});
+    return;
+  }
+  if (!mine) return deny(c, w, i, 'Hanya pemilik (' + V.owner + ') yang bisa mengatur Vending Machine ini.');
+  if (m.op === 'stock'){
+    const key = String(m.key || '');
+    if (!econ.isKey(key) || key === D.FIST || key === D.WRENCH) return deny(c, w, i, 'Item ini tidak bisa dijual.');
+    if (V.key && V.n > 0 && V.key !== key) return deny(c, w, i, 'Mesin masih berisi ' + nm(V.key) + '. Ambil stoknya dulu untuk ganti barang.');
+    if (!Number.isInteger(n) || n < 1) return deny(c, w, i, 'Jumlah tidak valid.');
+    const have = (E.bag.find(s => s.key === key) || {n: 0}).n;
+    if (have < n) return deny(c, w, i, 'Kamu hanya punya ' + have + ' ' + nm(key) + '.');
+    if (V.n + n > D.STACK) return deny(c, w, i, 'Stok maksimal ' + D.STACK + ' (sekarang ' + V.n + ').');
+    econ.run(E, g => g.takeItem(key, n));
+    V.key = key; V.n += n;
+    return done(n + ' ' + nm(key) + ' dimasukkan ke Vending Machine (stok ' + V.n + ').');
+  }
+  if (m.op === 'take'){
+    if (!V.key || V.n < 1) return deny(c, w, i, 'Stok kosong.');
+    const k = Number.isInteger(m.n) && m.n > 0 ? Math.min(m.n, V.n) : V.n;   // tanpa jumlah = ambil semua
+    const err = econ.fits(E, [[V.key, k]]); if (err) return deny(c, w, i, err);
+    econ.run(E, g => g.addItem(V.key, k)); V.n -= k; const key = V.key; if (!V.n) V.key = null;
+    return done(k + ' ' + nm(key) + ' diambil dari Vending Machine.');
+  }
+  if (m.op === 'price'){
+    const p = m.price; if (!Number.isInteger(p) || p < 1 || p > VEND_PRICE_MAX) return deny(c, w, i, 'Harga 1–' + fmt(VEND_PRICE_MAX) + ' gems per item.');
+    V.price = p; return done('Harga diatur: ' + fmt(p) + ' gems per item.');
+  }
+  if (m.op === 'collect'){
+    if (!V.earned) return deny(c, w, i, 'Belum ada hasil penjualan.');
+    const g0 = V.earned; econ.run(E, g => g.addGems(g0)); V.earned = 0;
+    return done(fmt(g0) + ' gems hasil penjualan diambil.');
   }
 }
 function insideSolidAt(st, tx, ty){ return st.x < (tx + 1) * TS && st.x + 26 > tx * TS && st.y < (ty + 1) * TS && st.y + 30 > ty * TS; }
@@ -581,6 +661,7 @@ function handle(c, m){
     case 'create': return handle(c, {...m, t: 'join'});   // klien lama
     case 'leave': leaveWorld(c); return c.send({t: 'left'});
     case 'act': return handleAct(c, m);
+    case 'vend': return handleVend(c, m);
     case 'ops': return c.send({t: 'err', text: 'Versi game lama. Muat ulang halaman (Ctrl+F5).'});
     case 'pos': {
       if (!c.world || !m.s || typeof m.s !== 'object') return;
@@ -631,6 +712,14 @@ function handle(c, m){
     case 'buy': {
       if (social.inTrade(c.user)) return c.send({t: 'note', text: 'Selesaikan trade dulu.'});
       const E = econOf(c.user), err = econ.buy(E, String(m.key || ''));
+      if (err){ econ.out.length = 0; return c.send({t: 'note', text: err}); }
+      saveEcon(c.user); return pushEcon(c);
+    }
+    case 'lockConvert': {
+      // v1.4: 100 World Lock <-> 1 Crystal Lock
+      if (social.inTrade(c.user)) return c.send({t: 'note', text: 'Selesaikan trade dulu.'});
+      const E = econOf(c.user), key = m.key === 'b34' ? 'b34' : 'b30';
+      const err = econ.run(E, g => g.convertLocks(key));
       if (err){ econ.out.length = 0; return c.send({t: 'note', text: err}); }
       saveEcon(c.user); return pushEcon(c);
     }

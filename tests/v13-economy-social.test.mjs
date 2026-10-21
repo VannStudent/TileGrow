@@ -53,7 +53,7 @@ await sleep(300); ok('spam pukul cepat dibatasi', !(a.q.some(m => m.t === 'ops' 
 S(a, {t: 'buy', key: 'w_devil'}); let nt = await wait(a, 'note'); ok('beli tanpa gems cukup ditolak server', nt && /Gems/.test(nt.text));
 S(a, {t: 'chat', text: '/testgive gem 5000'}); await lastEcon(a);
 S(a, {t: 'buy', key: 'b30'}); ea = await lastEcon(a);
-ok('beli World Lock: gems berkurang 200, lock masuk tas', ea && ea.gems === 4850 + 0 - 0 + (ea.gems - ea.gems) && ea.bag.some(s => s.key === 'b30'), 'gems ' + (ea && ea.gems));
+ok('beli World Lock: gems berkurang 1.800 (v1.4), lock masuk tas', ea && ea.gems === 5050 - 1800 && ea.bag.some(s => s.key === 'b30'), 'gems ' + (ea && ea.gems));
 
 // ---------- 3. drop & pickup dibagi ----------
 S(b, {t: 'join', name: 'TEST'}); await wait(b, 'world'); await wait(a, 'pjoin'); posAt(b, 52, 29); await sleep(80); drain(a); drain(b);

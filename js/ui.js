@@ -8,9 +8,11 @@ function toast(msg){
   clearTimeout(toastT); toastT = setTimeout(()=> t.classList.remove('show'), 1800);
 }
 function cellHTML(s){ return '<img src="' + icon(s.key) + '">' + (s.key !== FIST && s.key !== WRENCH && s.n > 1 ? '<span class="n">' + s.n + '</span>' : ''); }
+// v1.4: warna rarity di bingkai slot
+function rarityStyle(key){ const r = rarityOf(key); return r === 'common' ? '' : '--rc:' + RARITY[r].color; }
 
 function openModal(id){ document.querySelectorAll('.modal').forEach(m => m.classList.toggle('hidden', m.id !== id)); refreshUI(); }
-function closeModals(){ document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden')); }
+function closeModals(){ document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden')); if (typeof vendOpen !== 'undefined') vendOpen = null; }
 function toggleModal(id){ const m = $(id); if (m.classList.contains('hidden')) openModal(id); else closeModals(); }
 
 function refreshUI(){
@@ -50,7 +52,8 @@ function refreshUI(){
   $('wrenchBtn').style.display = hasW ? '' : 'none';
   $('wrenchBtn').classList.toggle('active', holdW);
   $('wrenchHint').style.display = holdW ? '' : 'none';
-  const wl = worldLock(); $('pname').style.color = wl && wl.lock.owner === who() ? '#5dff6a' : '';
+  const wl = worldLock(), me = who().toLowerCase();
+  $('pname').style.color = online() && roleColor(net.role) ? roleColor(net.role) : wl && wl.lock.owner === who() ? '#5dff6a' : wl && (wl.lock.access || []).some(a => String(a).toLowerCase() === me) ? ACCESS_GREEN : '';
 
   const g = $('grid'); g.innerHTML = '';
   const cols = invCols();
@@ -59,11 +62,14 @@ function refreshUI(){
   for (let i=0;i<total;i++){
     const it = bag[i], el = document.createElement('div');
     const isSel = it && it.key === s0.key, w = it && isWorn(it.key);
-    el.className = 'cell' + (it ? '' : ' empty') + (isSel ? ' on' : '') + (w ? ' worn' : '') + (i >= bagSlots ? ' locked' : '');
+    el.className = 'cell' + (it ? '' : ' empty') + (isSel ? ' on' : '') + (w ? ' worn' : '') + (i >= bagSlots ? ' locked' : '') + (it && rarityOf(it.key) !== 'common' ? ' rar' : '');
     if (it){
+      const rs = rarityStyle(it.key); if (rs) el.setAttribute('style', rs);
       el.innerHTML = cellHTML(it) + (w ? '<span class="tag">DIPAKAI</span>' : '');
-      el.title = itemDef(it.key).name + (itemDef(it.key).kind === 'wear' ? ' (klik: pakai / lepas)' : '');
+      el.title = itemDef(it.key).name + ' · ' + rarityDef(it.key).name + (itemDef(it.key).kind === 'wear' ? ' (klik: pakai / lepas)' : '') +
+        (it.key === 'b30' ? ' · klik 2x: 100 World Lock → 1 Crystal Lock' : it.key === 'b34' ? ' · klik 2x: pecah jadi 100 World Lock' : '');
       el.onclick = ()=> pickFromBag(it.key);
+      if (it.key === 'b30' || it.key === 'b34') el.ondblclick = ()=> lockConvert(it.key);
     }
     g.appendChild(el);
   }
@@ -72,6 +78,7 @@ function refreshUI(){
   $('selnm').textContent = itemDef(s0.key).name + (s0.n > 1 ? ' × ' + s0.n : '');
   $('qty').max = s0.n;
   $('bdrop').disabled = locked; $('btrash').disabled = locked;
+  $('selnm').style.color = rarityDef(s0.key).color;
   applyInvHeight();
   if (!$('shop').classList.contains('hidden')) renderShop();
   if (!$('prof').classList.contains('hidden')) renderProfile();
@@ -91,6 +98,76 @@ function confirmDrop(){
   const s = selected(); if (!s) return closeModals();
   const n = Math.max(1, Math.min(s.n, parseInt($('drQty').value) || 1));
   closeModals(); dropSelected(n);
+}
+// ---------- v1.4: tukar World Lock <-> Crystal Lock ----------
+function lockConvert(key){
+  if (online()) return netSend({t: 'lockConvert', key});
+  const err = convertLocks(key); if (err) return toast(err);
+  sfx('buy'); toast(key === 'b30' ? 'Dapat 1 Crystal Lock!' : 'Dapat 100 World Lock.'); refreshUI(); save();
+}
+// ---------- v1.4: info item ----------
+function itemFacts(key){
+  const d = itemDef(key), f = [];
+  if (d.kind === 'block'){
+    const b = BY_ID[d.id];
+    if (b.lock) f.push(['Fungsi', b.lock === 'world' ? 'Mengunci seluruh world' + (b.worth ? ' (bernilai ' + b.worth + ' World Lock)' : '') : 'Mengunci ' + LOCK_TILES[b.lock] + ' tile di sekitarnya']);
+    else if (b.roll) f.push(['Fungsi', b.roll === 'dice' ? 'Pukul untuk lempar dadu 1–6' : 'Pukul untuk memutar roda 0–36']);
+    else if (b.wrench) f.push(['Fungsi', {sign:'Papan untuk menulis teks', door:'Pintu yang bisa diberi nama & dikunci', display:'Memajang satu item', vend:'Menjual item ke pemain lain (stok, harga, kas gems)'}[b.wrench] || '-']);
+    else if (b.platform) f.push(['Jenis', 'Platform (bisa dilewati dari bawah)']);
+    else if (b.bg) f.push(['Jenis', 'Dinding belakang']);
+    else f.push(['Jenis', b.solid ? 'Block padat' : 'Dekorasi']);
+    if (b.hits) f.push(['Pukulan untuk pecah', b.lock ? 5 : b.hits]);
+    if (b.gem) f.push(['Gems saat dipecah', b.gem[0] + '–' + b.gem[1]]);
+    if (b.xp) f.push(['XP saat dipecah', b.xp]);
+    if (b.light) f.push(['Bercahaya', 'Ya']);
+    if (b.danger) f.push(['Bahaya', 'Melukai saat disentuh']);
+    if (SEEDABLE.includes(d.id)) f.push(['Seed', '30% saat dipecah']);
+  } else if (d.kind === 'seed'){
+    const b = BY_ID[d.id];
+    f.push(['Tumbuh jadi', 'Pohon ' + b.name]);
+    f.push(['Waktu tumbuh', GROW_MS[d.id] >= 60000 ? Math.round(GROW_MS[d.id]/60000) + ' menit' : Math.round(GROW_MS[d.id]/1000) + ' detik']);
+    f.push(['Panen', '1–3 ' + b.name + ', 50% seed, 2–4 gems']);
+    const rs = Object.entries(RECIPES).filter(([k]) => k.split('+').map(Number).includes(d.id)).map(([k, v]) => { const [a, c] = k.split('+').map(Number); return BY_ID[a === d.id ? c : a].name + ' → ' + BY_ID[v].name; });
+    if (rs.length) f.push(['Splice dengan', rs.join(', ')]);
+  } else if (d.kind === 'wear'){
+    f.push(['Slot', SLOT_NAME[d.slot]]);
+    if (d.wear.jumps) f.push(['Efek', 'Lompat ' + d.wear.jumps + ' kali']);
+    if (d.slot === 'tool') f.push(['Efek', 'Pecah block 1 pukulan lebih cepat']);
+    if (!d.wear.jumps && d.slot !== 'tool') f.push(['Efek', 'Kosmetik']);
+  } else if (d.kind === 'fist') f.push(['Fungsi', 'Memukul block, memanen pohon']);
+  else if (d.kind === 'wrench') f.push(['Fungsi', 'Mengatur block (papan, pintu, lock) dan membuka menu pemain lain']);
+  const sh = SHOP.find(x => x.give.length === 1 && x.give[0][0] === key);
+  f.push(['Harga toko', sh ? shopPrice(sh).toLocaleString('id-ID') + ' gems' + (sh.give[0][1] > 1 ? ' / ' + sh.give[0][1] : '') : 'Tidak dijual']);
+  f.push(['Bisa di-trade', key === FIST || key === WRENCH ? 'Tidak' : 'Ya']);
+  return f;
+}
+function itemDesc(key){
+  const d = itemDef(key);
+  if (key === 'b30') return 'Kunci world milikmu. Kumpulkan 100, lalu klik 2x di tas untuk menggabungnya jadi 1 Crystal Lock.';
+  if (key === 'b34') return 'Lock paling berharga. Bisa dipasang untuk mengunci world, atau klik 2x di tas untuk memecahnya jadi 100 World Lock.';
+  const sh = SHOP.find(x => x.give.length === 1 && x.give[0][0] === key);
+  if (sh && sh.desc) return sh.desc.replace(/ · klik di tas untuk pakai$/, '');
+  if (d.kind === 'wear' && d.wear.desc) return d.wear.desc;
+  if (d.kind === 'seed') return 'Tanam di atas block padat. Tunggu sampai matang, lalu pukul untuk panen.';
+  if (d.kind === 'block' && BY_ID[d.id].gem && !BY_ID[d.id].farm) return 'Bijih di bawah tanah. Pecahkan untuk mendapat gems.';
+  return '';
+}
+function openItemInfo(key){
+  key = key || selected().key;
+  const d = itemDef(key), r = rarityDef(key), n = countOf(key);
+  $('iiIcon').src = icon(key); $('iiName').textContent = d.name; $('iiName').style.color = r.color;
+  $('iiRar').textContent = r.name; $('iiRar').style.background = r.color;
+  $('iiCount').textContent = key === FIST || key === WRENCH ? '' : 'Di tas: ' + n;
+  $('iiDesc').textContent = itemDesc(key);
+  $('iiFacts').innerHTML = itemFacts(key).map(([a, b]) => '<div><span>' + esc(a) + '</span><b>' + esc(String(b)) + '</b></div>').join('');
+  const acts = $('iiActs'); acts.innerHTML = '';
+  const add = (txt, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = txt; b.onclick = fn; acts.appendChild(b); };
+  if (d.kind === 'wear' && n) add(isWorn(key) ? 'Lepas' : 'Pakai', 'primary', ()=>{ toggleWear(key); closeModals(); });
+  else if (n && key !== FIST) add('Pegang', 'primary', ()=>{ pickFromBag(key); closeModals(); });
+  if (key === 'b30') add('Gabung 100 → Crystal Lock', '', ()=>{ lockConvert('b30'); closeModals(); });
+  if (key === 'b34' && n) add('Pecah → 100 World Lock', '', ()=>{ lockConvert('b34'); closeModals(); });
+  add('Tutup', 'x', closeModals);
+  openModal('itemInfoM');
 }
 // ---------- dialog keluar lewat pintu utama ----------
 function exitDoorPrompt(){ $('exName').textContent = worldName; openModal('exitM'); }
@@ -176,7 +253,8 @@ const SHOP_CATS = [
   {id:'farm',   name:'Farmable',        tag:'Tanam & panen gems', color:['#5ad87a','#1f8a4a'], icon:'s54'},
   {id:'wear',   name:'Wearables',       tag:'Sayap, baju, topi', color:['#e85aa8','#8a2a7a'], icon:'w_devil'},
   {id:'lock',   name:'Lock & Alat',     tag:'Amankan world-mu',  color:['#7fd8f5','#2d6c8a'], icon:'b30'},
-  {id:'khusus', name:'Block Khusus',    tag:'Papan, pintu, platform', color:['#c99159','#73491f'], icon:'b21'},
+  {id:'khusus', name:'Block Khusus',    tag:'Papan, pintu, vending', color:['#c99159','#73491f'], icon:'b21'},
+  {id:'fun',    name:'Interaktif',      tag:'Dadu & roulette',   color:['#ff7a5a','#a8322a'], icon:'b61'},
   {id:'block',  name:'Block Bangunan',  tag:'Isi ulang stok',    color:['#a2abb9','#515a69'], icon:'b9'}
 ];
 let shopTab = 'home', shopSel = null;
@@ -185,9 +263,10 @@ function shopItemsOf(cat){
   return SHOP.filter(it => {
     if (cat === 'paket') return ['starter','builder','farmer','bag8'].includes(it.key);
     if (cat === 'lock') return ['b30','b31','b32','b33',WRENCH].includes(it.key);
-    if (cat === 'khusus') return ['b20','b21','b22','b40','b41','b42'].includes(it.key);
+    if (cat === 'khusus') return ['b20','b21','b22','b40','b41','b42','b62'].includes(it.key);
     if (cat === 'wear') return it.tab === 'wear';
     if (cat === 'farm') return it.tab === 'farm';
+    if (cat === 'fun') return it.tab === 'fun';
     // block bangunan: x25 biasa, tanpa platform & dinding gua (pindah ke Block Khusus)
     return it.name.endsWith('x25') && !['b40','b41','b42'].includes(it.key) && !it.tab;
   });
@@ -236,7 +315,9 @@ function renderShop(){
     const el = document.createElement('button');
     el.className = 'scard' + (shopSel === it ? ' on' : '') + (gems < price && !maxed ? ' poor' : '');
     el.style.setProperty('--c1', cat.color[0]); el.style.setProperty('--c2', cat.color[1]);
-    el.innerHTML = (owned ? '<span class="own">PUNYA</span>' : '') + '<div class="art"><img src="' + icon(shopIconOf(it)) + '"></div><b>' + esc(it.name) + '</b>' +
+    const rk = it.give.length === 1 ? rarityOf(it.give[0][0]) : null;
+    el.innerHTML = (owned ? '<span class="own">PUNYA</span>' : '') + (rk && rk !== 'common' ? '<span class="rar" style="background:' + RARITY[rk].color + '">' + RARITY[rk].name + '</span>' : '') +
+      '<div class="art"><img src="' + icon(shopIconOf(it)) + '"></div><b>' + esc(it.name) + '</b>' +
       '<span class="pr"><img src="' + icon('gem') + '">' + (maxed ? 'Maks' : price.toLocaleString('id-ID')) + '</span>';
     el.onclick = ()=>{ shopSel = it; renderShop(); };
     el.ondblclick = ()=>{ shopSel = it; buy(it); };
@@ -353,6 +434,7 @@ function openDialog(kind, ctxd){
     html = '<p class="note">Tempat kamu muncul dan respawn. ' + (wl ? 'World ini dikunci oleh <b>' + esc(wl.lock.owner) + '</b>.' : 'World ini belum dikunci.') + '</p>';
   }
   $('dlgTitle').textContent = title; box.innerHTML = html;
+  { const x = document.querySelector('#dlg .btn.x'); if (x) x.textContent = 'Batal'; }
   $('dlgSave').style.display = kind === 'maindoor' ? 'none' : '';
   if (kind === 'display') box.querySelectorAll('.pickgrid .cell').forEach(c => c.onclick = ()=>{ box.querySelectorAll('.pickgrid .cell').forEach(x=>x.classList.remove('on')); c.classList.add('on'); });
   $('dlgSave').onclick = ()=>{
@@ -387,6 +469,78 @@ function openDialog(kind, ctxd){
   openModal('dlg');
   const first = box.querySelector('input:not([type=checkbox]),textarea'); if (first) setTimeout(()=>first.focus(), 30);
 }
+// ---------- v1.4: Vending Machine ----------
+// Pemilik: isi stok dari tas, pasang harga, ambil stok & gems hasil jualan. Pemain lain: beli.
+// Online: semua lewat server (pesan 'vend'); dialog digambar ulang saat tile berubah.
+let vendOpen = null;
+function vendSend(op, extra){
+  const V = meta.get(vendOpen) && meta.get(vendOpen).vend; if (!V) return;
+  if (online()) return netSend(Object.assign({t: 'vend', op, i: vendOpen}, extra || {}));
+  // offline: hanya pemilik (kamu sendiri) yang ada di world ini
+  const fmt = n => n.toLocaleString('id-ID'), nm = k => itemDef(k).name;
+  if (op === 'stock'){
+    const {key, n} = extra;
+    if (V.key && V.n > 0 && V.key !== key) return toast('Mesin masih berisi ' + nm(V.key) + '. Ambil stoknya dulu.');
+    if (countOf(key) < n) return toast('Kamu hanya punya ' + countOf(key) + ' ' + nm(key) + '.');
+    if (V.n + n > STACK) return toast('Stok maksimal ' + STACK + '.');
+    takeItem(key, n); V.key = key; V.n += n; say('act', n + ' ' + nm(key) + ' dimasukkan ke Vending Machine.');
+  } else if (op === 'take'){
+    if (!V.key || !V.n) return toast('Stok kosong.');
+    const k = addItem(V.key, V.n); if (!k) return toast('Tas penuh.');
+    V.n -= k; if (!V.n) V.key = null;
+  } else if (op === 'price'){
+    if (!(extra.price >= 1 && extra.price <= 100000)) return toast('Harga 1–100.000 gems per item.');
+    V.price = extra.price; toast('Harga diatur: ' + fmt(V.price) + ' gems per item.');
+  } else if (op === 'collect'){
+    if (!V.earned) return toast('Belum ada hasil penjualan.');
+    gems += V.earned; say('act', fmt(V.earned) + ' gems hasil penjualan diambil.'); V.earned = 0;
+  }
+  netTouch(vendOpen); sfx('place'); refreshUI(); renderVend();
+}
+function openVend(i){ vendOpen = i; renderVend(); openModal('dlg'); const x = document.querySelector('#dlg .btn.x'); if (x) x.textContent = 'Tutup'; }
+function renderVend(){
+  const box = $('dlgBody'), m = vendOpen !== null && meta.get(vendOpen);
+  if (!m || !m.vend || fg[vendOpen] !== 62){ if (vendOpen !== null && !$('dlg').classList.contains('hidden')) closeModals(); vendOpen = null; return; }
+  const V = m.vend, mine = V.owner === who(), fmt = n => n.toLocaleString('id-ID');
+  const itemRow = V.key
+    ? '<div class="vendItem"><img src="' + icon(V.key) + '"><div><b>' + esc(itemDef(V.key).name) + '</b><span class="rar" style="--rc:' + rarityDef(V.key).color + '">' + rarityDef(V.key).name + '</span><br>' +
+      '<span class="note">Stok: <b>' + V.n + '</b> · Harga: <b style="color:#7be37a">' + (V.price ? fmt(V.price) + ' gems' : 'belum diatur') + '</b> / item</span></div></div>'
+    : '<p class="note">Mesin kosong.' + (mine ? ' Pilih item dari tas di bawah untuk dijual.' : '') + '</p>';
+  $('dlgTitle').textContent = 'Vending Machine · ' + V.owner;
+  let html = itemRow;
+  if (mine){
+    const opts = bag.filter(s => s.key !== FIST && s.key !== WRENCH && !isWorn(s.key) && (!V.key || !V.n || s.key === V.key));
+    html += '<label>Isi stok dari tas</label><div class="pickgrid" id="vPick">' +
+      opts.map(s => '<div class="cell' + (s.key === V.key ? ' on' : '') + '" data-k="' + esc(s.key) + '" title="' + esc(itemDef(s.key).name) + ' (' + s.n + ')"><img src="' + icon(s.key) + '"><span class="n">' + s.n + '</span></div>').join('') + '</div>' +
+      '<div class="vendRow"><input id="vN" type="number" min="1" max="' + STACK + '" value="1"><button class="btn" id="vStock" type="button">Masukkan</button>' +
+      '<button class="btn" id="vTake" type="button"' + (V.n ? '' : ' disabled') + '>Ambil semua stok</button></div>' +
+      '<label>Harga per item (gems)</label><div class="vendRow"><input id="vPrice" type="number" min="1" max="100000" value="' + (V.price || '') + '" placeholder="contoh: 50"><button class="btn" id="vSetPrice" type="button">Pasang harga</button></div>' +
+      '<div class="vendRow vendCash"><span>Kas mesin: <b style="color:#7be37a">' + fmt(V.earned) + ' gems</b></span><button class="btn primary" id="vCollect" type="button"' + (V.earned ? '' : ' disabled') + '>Ambil gems</button></div>' +
+      '<p class="note">Pembeli memakai kunci inggris pada mesin ini. Mesin hanya bisa dipecah kalau stok dan kas sudah kosong.</p>';
+  } else {
+    const can = V.key && V.n > 0 && V.price > 0, maxN = can ? Math.max(1, Math.min(V.n, Math.floor(gems / V.price))) : 1;
+    html += can ? '<div class="vendRow"><label style="margin:0">Jumlah</label><input id="vN" type="number" min="1" max="' + V.n + '" value="1">' +
+      '<button class="btn" id="vMax" type="button">Maks (' + maxN + ')</button></div>' +
+      '<div class="vendRow vendCash"><span>Total: <b id="vTotal" style="color:#7be37a">' + fmt(V.price) + ' gems</b> · Gems-mu: ' + fmt(gems) + '</span><button class="btn primary" id="vBuy" type="button">Beli</button></div>'
+      : '<p class="note">' + (V.key && V.n > 0 ? 'Pemilik belum memasang harga.' : 'Stok habis.') + '</p>';
+  }
+  box.innerHTML = html;
+  $('dlgSave').style.display = 'none';
+  const N = () => Math.max(1, parseInt($('vN').value, 10) || 1);
+  if (mine){
+    let pick = V.key || (opts0 => opts0 && opts0.dataset.k)(box.querySelector('#vPick .cell'));
+    box.querySelectorAll('#vPick .cell').forEach(c => c.onclick = ()=>{ box.querySelectorAll('#vPick .cell').forEach(x => x.classList.remove('on')); c.classList.add('on'); pick = c.dataset.k; $('vN').max = countOf(pick); });
+    if (!V.key){ const f = box.querySelector('#vPick .cell'); if (f) f.classList.add('on'); }
+    $('vStock').onclick = ()=>{ if (!pick) return toast('Pilih item dulu.'); vendSend('stock', {key: pick, n: N()}); };
+    $('vTake').onclick = ()=> vendSend('take', {n: V.n});
+    $('vSetPrice').onclick = ()=> vendSend('price', {price: parseInt($('vPrice').value, 10) || 0});
+    $('vCollect').onclick = ()=> vendSend('collect');
+  } else if ($('vBuy')){
+    const upd = ()=> $('vTotal').textContent = fmt(V.price * Math.min(N(), V.n)) + ' gems';
+    $('vN').oninput = upd; $('vMax').onclick = ()=>{ $('vN').value = Math.max(1, Math.min(V.n, Math.floor(gems / V.price))); upd(); };
+    $('vBuy').onclick = ()=>{ const n = Math.min(N(), V.n); if (V.price * n > gems) return toast('Gems tidak cukup.'); vendSend('buy', {n, key: V.key, price: V.price}); };
+  }
+}
 function esc(s){ return String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // ---------- menu & pengaturan ----------
@@ -398,6 +552,7 @@ function renderMenu(){
   $('optZoom').min = ZOOM_MIN; $('optZoom').max = ZOOM_MAX; $('optZoom').value = zoom; $('optZoomV').textContent = Math.round(zoom*100) + '%';
 }
 function bindUI(){
+  $('binfo').onclick = ()=> openItemInfo();
   $('ishop').onclick = ()=>{ shopTab = 'home'; shopSel = null; toggleModal('shop'); };
   $('imenu').onclick = ()=>{ renderMenu(); toggleModal('menu'); };
   document.querySelectorAll('.modal .x').forEach(b => b.onclick = closeModals);

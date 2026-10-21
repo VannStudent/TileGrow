@@ -205,7 +205,8 @@ function createSocial(S){
   // ---------- command staff ----------
   const HELP = {
     mod: '/mute NAMA DURASI [alasan] · /unmute NAMA · /freeze NAMA · /unfreeze NAMA · /kick NAMA [alasan] · /ban NAMA DURASI(maks 7d) [alasan] · /unban NAMA (ban buatanmu) · /noclip · /zoom · /tp NAMA · /summon NAMA · /reports · /close ID · /who',
-    dev: ' · /ipban NAMA [DURASI] [alasan] · /unipban NAMA · /ban NAMA perm · /unban semua · /setrole NAMA mod|player · /invis'
+    dev: ' · /ipban NAMA [DURASI] [alasan] · /unipban NAMA · /ban NAMA perm · /unban semua · /setrole NAMA mod|player · /invis' +
+         ' · /give item NAMA ITEM [JUMLAH] · /give gems NAMA JUMLAH · /items KATA (cari kode item)'
   };
   // target harus online untuk mute/freeze/kick/tp/summon; ban/mute juga bisa offline (lewat akun)
   function canTouch(by, target){
@@ -217,10 +218,10 @@ function createSocial(S){
     const parts = line.slice(1).trim().split(/\s+/), cmd = (parts.shift() || '').toLowerCase();
     const r = rankOf(c.user);
     const say = text => c.send({t: 'staff', text});
-    const STAFF = ['mute','unmute','freeze','unfreeze','kick','ban','unban','noclip','zoom','tp','summon','reports','close','ipban','unipban','setrole','invis','staffhelp','role'];
+    const STAFF = ['mute','unmute','freeze','unfreeze','kick','ban','unban','noclip','zoom','tp','summon','reports','close','ipban','unipban','setrole','invis','staffhelp','role','give','items'];
     if (!STAFF.includes(cmd)) return false;
     if (r < RANK.mod) { c.send({t: 'note', text: 'Perintah tidak dikenal: /' + cmd}); return true; }   // player biasa: seolah command tidak ada
-    const devOnly = ['ipban','unipban','setrole','invis'];
+    const devOnly = ['ipban','unipban','setrole','invis','give','items'];
     if (devOnly.includes(cmd) && r < RANK.dev){ say('Perintah ini khusus Developer.'); return true; }
     const name = parts[0], ta = name ? acc(name) : null;
     const needTarget = () => { if (!name || !ta){ say('Pemain ' + (name || '?') + ' tidak ditemukan.'); return false; } const e = canTouch(c.user, ta.name); if (e){ say(e); return false; } return true; };
@@ -290,6 +291,39 @@ function createSocial(S){
         ta.role = role === 'player' ? undefined : role; S.saveAccounts(); S.roleChanged(ta.name);
         staffLog(c.user, 'setrole', ta.name, {role}); say(ta.name + ' sekarang ' + ROLE_NAME[role === 'player' ? 'player' : role] + '.'); return true;
       }
+      case 'items': {
+        const q = parts.join(' ').toLowerCase(); if (!q){ say('Pakai: /items KATA, contoh /items lock'); return true; }
+        const hits = allItems().filter(([k, n]) => k.toLowerCase().includes(q) || n.toLowerCase().includes(q)).slice(0, 15);
+        say(hits.length ? hits.map(([k, n]) => k + ' = ' + n).join(' · ') : 'Tidak ada item yang cocok dengan "' + q + '".'); return true;
+      }
+      case 'give': {
+        // v1.4 (khusus Developer): /give item NAMA ITEM [JUMLAH]  ·  /give gems NAMA JUMLAH
+        const what = (parts[0] || '').toLowerCase(), tn = parts[1], tacc = tn ? acc(tn) : null;
+        const usage = 'Pakai: /give item NAMA ITEM [JUMLAH]  atau  /give gems NAMA JUMLAH';
+        if (what !== 'item' && what !== 'gems' && what !== 'gem'){ say(usage); return true; }
+        if (!tacc){ say('Pemain ' + (tn || '?') + ' tidak ditemukan.'); return true; }
+        if (tradeOf.has(tacc.name)){ say(tacc.name + ' sedang trade. Coba lagi nanti.'); return true; }
+        const E = S.econOf(tacc.name), tc = S.findOnline(tacc.name);
+        if (what !== 'item'){
+          const n = parseInt(parts[2], 10);
+          if (!Number.isInteger(n) || n < 1 || n > GIVE_GEMS_MAX){ say('Jumlah gems 1–' + GIVE_GEMS_MAX.toLocaleString('id-ID') + '. ' + usage); return true; }
+          S.econ.run(E, g => g.addGems(n)); S.saveEcon(tacc.name);
+          staffLog(c.user, 'giveGems', tacc.name, {n});
+          if (tc) S.pushEcon(tc, [['act', display(c.user) + ' memberimu ' + n.toLocaleString('id-ID') + ' gems.']]);
+          say(n.toLocaleString('id-ID') + ' gems diberikan ke ' + tacc.name + (tc ? '.' : ' (offline, masuk saat dia login).')); return true;
+        }
+        const rest = parts.slice(2); let n = 1;
+        if (rest.length > 1 && /^\d+$/.test(rest[rest.length - 1])) n = parseInt(rest.pop(), 10);
+        const key = findItem(rest.join(' '));
+        if (!key){ say('Item "' + rest.join(' ') + '" tidak ditemukan. Cari kodenya dengan /items KATA.'); return true; }
+        if (n < 1 || n > S.econ.D.STACK){ say('Jumlah 1–' + S.econ.D.STACK + ' per perintah.'); return true; }
+        const got = S.econ.run(E, g => g.addItem(key, n));
+        if (!got){ say('Tas ' + tacc.name + ' penuh atau stack item itu sudah ' + S.econ.D.STACK + '.'); return true; }
+        S.saveEcon(tacc.name); staffLog(c.user, 'giveItem', tacc.name, {key, n: got});
+        const nm = S.econ.D.itemDef(key).name;
+        if (tc) S.pushEcon(tc, [['act', display(c.user) + ' memberimu ' + got + ' ' + nm + '.']]);
+        say(got + ' ' + nm + ' diberikan ke ' + tacc.name + (got < n ? ' (hanya muat ' + got + ')' : '') + (tc ? '.' : ' (offline).')); return true;
+      }
       case 'tp': case 'summon': {
         if (!name || !ta){ say('Pemain tidak ditemukan.'); return true; }
         const tc = S.findOnline(ta.name); if (!tc || !tc.world){ say(ta.name + ' tidak sedang di world mana pun.'); return true; }
@@ -305,6 +339,22 @@ function createSocial(S){
       case 'close': { const x = reports.find(x => x.id === +name); if (!x){ say('Laporan tidak ditemukan.'); return true; } x.open = false; x.closedBy = c.user; write(REP_FILE, reports); staffLog(c.user, 'closeReport', x.target, {id: x.id}); say('Laporan #' + x.id + ' ditutup.'); return true; }
     }
     return true;
+  }
+
+  // ---------- v1.4: daftar item untuk /give ----------
+  const GIVE_GEMS_MAX = 1000000;
+  function allItems(){
+    const D = S.econ.D, out = [[D.WRENCH, 'Kunci Inggris']];
+    for (const id in D.BY_ID){ const d = D.BY_ID[id]; if (+id === 0 || +id === 8) continue; out.push(['b' + id, d.name]); if (D.SEEDABLE.includes(+id) || Object.values(D.RECIPES).includes(+id)) out.push(['s' + id, 'Seed ' + d.name]); }
+    for (const k in D.WEAR) out.push([k, D.WEAR[k].name]);
+    return out;
+  }
+  function findItem(q){
+    q = String(q || '').trim().toLowerCase(); if (!q) return null;
+    const list = allItems();
+    const exact = list.find(([k, n]) => k.toLowerCase() === q || n.toLowerCase() === q); if (exact) return exact[0];
+    const part = list.filter(([, n]) => n.toLowerCase().includes(q));
+    return part.length === 1 ? part[0][0] : null;
   }
 
   // ---------- set role oleh pemilik server (console & panel admin localhost) ----------
