@@ -1,0 +1,70 @@
+TILEGROW v1.3.1 - CARA PAKAI
+===========================
+
+ISI ZIP
+  start-server.bat              -> menjalankan server (untuk main bareng satu WiFi)
+  Panel-Role.bat                -> membuka Panel Role (set Developer/Moderator)
+  tilegrow-v1.3.1-offline.html  -> main sendiri, tanpa server, bisa dibuka langsung
+  tilegrow.html + folder js     -> dipakai server, JANGAN dibuka langsung
+
+PENTING: ekstrak dulu ZIP-nya (klik kanan > Extract All). Jangan jalankan file dari dalam ZIP.
+
+
+A. MAIN SENDIRI (OFFLINE)
+  Klik dua kali tilegrow-v1.3.1-offline.html > Main Offline > Daftar.
+  File ini boleh dikirim sendirian ke teman.
+  Trade, teman, dan role tidak ada di mode ini (butuh server).
+
+
+B. MAIN BARENG (ONLINE, SATU WIFI)
+  Yang jadi server (satu PC saja):
+  1. Pasang Node.js versi 18 atau lebih baru: https://nodejs.org (pilih LTS).
+  2. Tutup dulu semua jendela "TileGrow Server" lama, termasuk versi lama.
+  3. Klik dua kali start-server.bat.
+     Kalau Windows Firewall bertanya, centang "Private networks" lalu Allow.
+  4. Jendela hitam akan menampilkan tulisan seperti ini:
+        Di WiFi/LAN    : http://192.168.1.10:8080
+        Versi server: v1.3.1
+     Kalau yang muncul tulisan GAGAL: port sudah dipakai, tutup server lama dulu.
+  5. Jangan tutup jendela hitam itu selama bermain.
+
+  Teman (HP atau laptop di WiFi yang sama):
+  1. Buka browser (Chrome dan sejenisnya), lalu ketik alamat dari langkah 4,
+     contoh: http://192.168.1.10:8080
+  2. Pilih "Main Online", lalu Daftar atau Masuk.
+  Teman TIDAK perlu file apa pun. Kalau teman membuka tilegrow.html sendiri, yang terlihat hanya tampilannya
+  dan game tidak bisa dimainkan.
+
+  Tidak bisa tersambung?
+  - Pastikan semua perangkat di WiFi yang sama. Pakai WiFi rumah, bukan WiFi tamu.
+  - Ulangi langkah Firewall: Windows Security > Firewall > Allow an app > Node.js > centang Private.
+  - WiFi sekolah, kampus, atau kantor sering memblokir koneksi antar perangkat. Coba hotspot HP.
+
+
+C. MEMBERI ROLE (DEVELOPER / MODERATOR)
+  Syarat: start-server.bat sedang jalan di PC ini, dan pemainnya sudah pernah daftar.
+
+  Cara 1 - Panel Role:
+  1. Klik dua kali Panel-Role.bat. Browser akan membuka http://localhost:8080/admin
+     (bisa juga diketik manual di browser PC server).
+  2. Cari nama pemain, pilih Developer atau Moderator, lalu klik Simpan.
+  3. Nama pemain langsung berubah: @oranye untuk Developer, @ungu untuk Moderator.
+
+  Cara 2 - lewat jendela server (kalau panel tidak bisa dibuka):
+     Klik jendela hitam server, lalu ketik  role NAMA dev  dan tekan Enter.
+     Untuk Moderator ketik  role NAMA mod , untuk mencabut role ketik  role NAMA player .
+
+  Panel tidak terbuka atau muncul "Not found"?
+  - Panel hanya bisa dibuka dari PC yang menjalankan server. Dari HP atau laptop lain memang ditolak, demi keamanan.
+  - Muncul "Not found" atau tampilan game lama? Berarti yang jalan masih server LAMA.
+    Tutup semua jendela server, jalankan start-server.bat lagi, dan pastikan tertulis "Versi server: v1.3.1".
+  - Halaman tidak bisa dibuka sama sekali? Berarti server belum jalan.
+  - Kalau server memakai port lain, ganti 8080 di alamat dengan port tersebut.
+
+  Hati-hati: Developer bisa ban permanen dan IP ban. Berikan hanya ke orang yang kamu percaya.
+  Siapa pun yang memakai PC server bisa membuka panel, jadi jangan tinggalkan PC itu terbuka.
+
+
+D. COMMAND STAFF DI GAME
+  Ketik /staffhelp di chat untuk melihat daftar lengkap.
+  Contoh: /mute NAMA 10m, /freeze NAMA, /kick NAMA, /ban NAMA 1d alasan, /noclip, /zoom

@@ -17,6 +17,7 @@ const {loadEcon} = require('./econ');
 const {createSocial, RANK} = require('./social');
 
 const PORT = +process.env.PORT || 8080;
+const VERSION = 'v1.3.1';
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = path.resolve(__dirname, '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
@@ -723,7 +724,14 @@ server.on('upgrade', (req, sock) => {
 setInterval(()=>{ for (const c of clients) try { c.sock.write(wsControl(9)); } catch(e){} }, 20000);
 
 server.on('error', e => {
-  console.error(e.code === 'EADDRINUSE' ? 'Port ' + PORT + ' sudah dipakai program lain. Tutup server lama atau pakai PORT lain.' : 'Server gagal jalan: ' + e.message);
+  if (e.code === 'EADDRINUSE'){
+    console.error('');
+    console.error('  GAGAL: port ' + PORT + ' sudah dipakai program lain.');
+    console.error('  Biasanya ini jendela server TileGrow LAMA yang masih terbuka.');
+    console.error('  Tutup semua jendela hitam "TileGrow Server" yang lain, lalu jalankan start-server.bat lagi.');
+    console.error('  (Atau pakai port lain: buka cmd di folder ini, ketik  set PORT=8081 && node server\\server.js )');
+    console.error('');
+  } else console.error('Server gagal jalan: ' + e.message);
   process.exit(1);
 });
 server.listen(PORT, HOST, () => {
@@ -733,7 +741,8 @@ server.listen(PORT, HOST, () => {
     if (a.family === 'IPv4' && !a.internal) console.log('  Di WiFi/LAN    : http://' + a.address + ':' + PORT);
   console.log('Data disimpan di ' + DATA + '. Tekan Ctrl+C untuk berhenti.');
   console.log('Ketik "help" di jendela ini untuk perintah server (misalnya: role NAMA dev).');
-  console.log('Panel role (hanya dari PC ini): ' + admin.url);
+  console.log('Panel role (hanya dari PC ini): ' + admin.url + '   <- atau klik dua kali Panel-Role.bat');
+  console.log('Versi server: ' + VERSION);
 });
 function shutdown(){ console.log('\nMenyimpan world & pemain...'); flushAll(); flushEcons(); process.exit(0); }
 // console server: atur role dari jendela server (ketik help)

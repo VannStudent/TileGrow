@@ -634,7 +634,7 @@
   </div></div>
   <!-- layar judul -->
   <div class="screen" id="scr-title"><div class="sbox card">
-    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice</small></div>
+    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice · v1.3.1</small></div>
     <button class="btn primary big" id="tOnline">🌐 Main Online (WiFi/LAN)</button>
     <button class="btn big" id="tPlay">Main Offline</button>
     <button class="btn big" id="tOptions">Opsi</button>
@@ -724,5 +724,17 @@
   document.getElementById('shopGemIcon').src = icon('gem');
 </script>
 <script src="js/main.js"></script>
+<script>
+  // Kalau file game (folder js/) tidak ikut terbaca, jangan tampilkan UI mati: beri tahu caranya.
+  if (typeof boot !== 'function'){
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#141c2c;color:#e8f0ff;font:16px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:20px';
+    d.innerHTML = '<div style="max-width:520px;line-height:1.5"><h2 style="margin:0 0 10px">Game tidak bisa dimuat</h2>' +
+      '<p>File ini butuh folder <b>js</b> di sebelahnya. Kemungkinan file dibuka langsung dari dalam ZIP atau dikirim sendirian.</p>' +
+      '<p><b>Mau main sendiri (offline)?</b> Pakai file <b>tilegrow-v1.3.1-offline.html</b>. File itu bisa dibuka sendirian.</p>' +
+      '<p><b>Mau main bareng (online)?</b> Jangan buka file ini. Minta alamat dari jendela server, misalnya <b>http://192.168.1.10:8080</b>, lalu buka alamat itu di browser.</p></div>';
+    document.body.appendChild(d);
+  }
+</script>
 </body>
 </html>
