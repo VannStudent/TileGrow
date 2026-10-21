@@ -300,11 +300,13 @@ function drawPlayer(rx, ry){
 
   if (settings.showNames){
     // pemilik World Lock: nama hijau (seperti Growtopia)
-    const wl = worldLock(), owner = wl && wl.lock.owner === who();
+    // nama: Moderator = @ ungu, Developer = @ oranye (berlaku untuk diri sendiri & pemain lain); pemilik World Lock hijau
+    const wl = worldLock(), owner = wl && wl.lock.owner === (NAME_OVERRIDE ? playerName : who());
     ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center';
-    const nm = who(), nw = ctx.measureText(nm).width;
+    const mine = !NAME_OVERRIDE && online(), rc = NAME_OVERRIDE ? NAME_OVERRIDE.color : (mine ? roleColor(net.role) : null);
+    const nm = NAME_OVERRIDE ? NAME_OVERRIDE.text : (mine ? net.display || who() : who()), nw = ctx.measureText(nm).width;
     ctx.lineWidth = 3; ctx.strokeStyle = OL; ctx.strokeText(nm, x + 6, ry - 6);
-    ctx.fillStyle = owner ? '#5dff6a' : guest ? '#9fd6ee' : '#ffffff'; ctx.fillText(nm, x + 6, ry - 6);
+    ctx.fillStyle = rc || (owner ? '#5dff6a' : guest ? '#9fd6ee' : '#ffffff'); ctx.fillText(nm, x + 6, ry - 6);
     if (typeof flagImg === 'function') ctx.drawImage(flagImg(playerFlag), x + 6 - nw/2 - 15, ry - 13, 12, 8);
     ctx.textAlign = 'left';
   }

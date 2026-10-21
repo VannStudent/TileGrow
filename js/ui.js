@@ -44,7 +44,7 @@ function refreshUI(){
   const tai = $('tActI'); if (tai && tai.dataset.k !== s0.key){ tai.dataset.k = s0.key; tai.src = icon(s0.key); }
   const ht = $('heldTag'); if (ht && ht.dataset.k !== s0.key){ ht.dataset.k = s0.key; ht.textContent = itemDef(s0.key).name; ht.classList.add('show'); clearTimeout(ht._t); ht._t = setTimeout(()=> ht.classList.remove('show'), 1600); }
   $('wname').textContent = worldName;
-  $('pname').textContent = who(); if ($('pflag').dataset.f !== playerFlag){ $('pflag').dataset.f = playerFlag; $('pflag').innerHTML = flagHTML(playerFlag, 14); }
+  $('pname').textContent = online() && net.display ? net.display : who(); if ($('pflag').dataset.f !== playerFlag){ $('pflag').dataset.f = playerFlag; $('pflag').innerHTML = flagHTML(playerFlag, 14); }
   // ikon kunci inggris di samping nama: muncul saat Kunci Inggris dipegang (atau dimiliki), klik = profil
   const holdW = selected().key === WRENCH, hasW = countOf(WRENCH) > 0;
   $('wrenchBtn').style.display = hasW ? '' : 'none';
@@ -138,9 +138,9 @@ function bindInvDrag(){
 
 // ---------- chat ----------
 // konsol ala Growtopia (di atas layar): tab SEMUA / CHAT / SISTEM / AKTIVITAS, tiap baris ada jam
-const CHAT_COL = {sys:'#9fd0ff', me:'#ffffff', pick:'#7be37a', level:'#ffd25e', quest:'#ffb3e0', act:'#c9b8ff'};
-const CHAT_TAG = {sys:'[S]', me:'', pick:'', level:'', quest:'', act:''};
-const CHAT_GROUP = {me:'chat', sys:'sys', level:'sys', quest:'sys', pick:'act', act:'act'};
+const CHAT_COL = {sys:'#9fd0ff', me:'#ffffff', pick:'#7be37a', level:'#ffd25e', quest:'#ffb3e0', act:'#c9b8ff', staff:'#ff9a2e'};
+const CHAT_TAG = {sys:'[S]', me:'', pick:'', level:'', quest:'', act:'', staff:'[STAFF]'};
+const CHAT_GROUP = {me:'chat', sys:'sys', level:'sys', quest:'sys', pick:'act', act:'act', staff:'sys'};
 let chatFilter = 'all';
 function hhmmss(t){ const d = new Date(t); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(v => String(v).padStart(2,'0')).join(':'); }
 function renderChat(){
@@ -149,7 +149,8 @@ function renderChat(){
   const rows = chat.filter(c => chatFilter === 'all' || CHAT_GROUP[c.kind] === chatFilter).slice(-60);
   box.innerHTML = rows.map(c => {
     let txt = esc(c.text);
-    if (c.kind === 'me'){ const k = txt.indexOf(':'); if (k > 0) txt = '<b style="color:#7be37a">' + txt.slice(0,k) + '</b>' + txt.slice(k); }
+    // nama di chat: Moderator @ungu, Developer @oranye, pemain biasa hijau
+    if (c.kind === 'me'){ const k = txt.indexOf(':'); if (k > 0) txt = '<b style="color:' + ((typeof roleColor === 'function' && roleColor(c.role)) || '#7be37a') + '">' + txt.slice(0,k) + '</b>' + txt.slice(k); }
     return '<div><span class="ts">' + hhmmss(c.t) + '</span> <span style="color:' + (CHAT_COL[c.kind] || '#fff') + '">' + (CHAT_TAG[c.kind] ? CHAT_TAG[c.kind] + ' ' : '') + txt + '</span></div>';
   }).join('') || '<div class="ts">Belum ada pesan.</div>';
   box.scrollTop = box.scrollHeight;
@@ -259,6 +260,7 @@ function setShopInfo(it){
 function buy(it){
   const price = shopPrice(it);
   if (gems < price) return toast('Gems tidak cukup.');
+  if (online()) return netSend({t: 'buy', key: it.key});          // server yang memotong gems & mengisi tas
   if (it.key === 'bag8'){ if (bagSlots >= 64) return; gems -= price; bagSlots += 8; sfx('buy'); toast('Tas sekarang ' + bagSlots + ' slot.'); return refreshUI(); }
   // cek tas muat semua isi sebelum bayar
   const sim = bag.map(s => ({...s})); let slots = bagSlots;
@@ -310,7 +312,7 @@ function renderProfile(){
           '<div class="xpline small"><div style="width:' + (have/q.need*100) + '%"></div></div><span>' + have + ' / ' + q.need + '</span></div>' +
           '<button class="btn primary" data-q="' + i + '"' + (q.claimed || !ready ? ' disabled' : '') + '>' + (q.claimed ? 'Selesai' : 'Klaim') + '</button></div>';
       }).join('');
-    body.querySelectorAll('[data-q]').forEach(b => b.onclick = ()=> claimQuest(+b.dataset.q));
+    body.querySelectorAll('[data-q]').forEach(b => b.onclick = ()=> online() ? netSend({t: 'claim', i: +b.dataset.q}) : claimQuest(+b.dataset.q));
   } else {
     body.innerHTML = GOALS.map(g => {
       const v = g.stat === 'level' ? prog.level : (st[g.stat] || 0), done = prog.goalsDone[g.id];
@@ -354,6 +356,16 @@ function openDialog(kind, ctxd){
   $('dlgSave').style.display = kind === 'maindoor' ? 'none' : '';
   if (kind === 'display') box.querySelectorAll('.pickgrid .cell').forEach(c => c.onclick = ()=>{ box.querySelectorAll('.pickgrid .cell').forEach(x=>x.classList.remove('on')); c.classList.add('on'); });
   $('dlgSave').onclick = ()=>{
+    if (online() && m){
+      // kirim isi dialog ke server; tile baru datang dari server
+      const nm = JSON.parse(JSON.stringify(m));
+      if (kind === 'sign') nm.sign.text = $('fText').value.trim();
+      if (kind === 'door'){ nm.door.name = $('fName').value.trim(); nm.door.locked = $('fLocked').checked; }
+      if (kind === 'display') nm.display.key = box.querySelector('.pickgrid .cell.on').dataset.k || null;
+      if (kind === 'lock'){ nm.lock.access = $('fAccess').value.split(',').map(s=>s.trim()).filter(Boolean).filter(n => n !== nm.lock.owner);
+        nm.lock.public = $('fPublic').checked; if ($('fAir')) nm.lock.ignoreAir = $('fAir').checked; nm.lock.tiles = null; }
+      netSend({t: 'act', a: 'meta', i: ctxd.i, meta: nm}); sfx('place'); closeModals(); return toast('Tersimpan.');
+    }
     if (kind === 'sign') m.sign.text = $('fText').value.trim();
     if (kind === 'door'){ m.door.name = $('fName').value.trim(); m.door.locked = $('fLocked').checked; }
     if (kind === 'display'){
@@ -416,7 +428,7 @@ function bindUI(){
   $('wGo').onclick = ()=>{ const n = $('wIn').value; $('wIn').value = ''; closeModals(); gotoWorld(n); };
   $('wRename').onclick = ()=>{ const n = prompt('Nama baru untuk world ' + worldName + ':', worldName); if (n){ renameWorld(n); renderWorlds(); } };
   $('zin').onclick = ()=> setZoom(zoom + .25);
-  $('zout').onclick = ()=> setZoom(zoom - .25);
+  $('zout').onclick = ()=> setZoom(zoom - .25 < ZOOM_MIN && online() && net.staff.zoom ? staffZoomMin() : zoom - .25);
   $('mResume').onclick = closeModals;
   $('mControls').onclick = ()=> openControlPicker(false);
   $('mLobby').onclick = ()=> exitToLobby();

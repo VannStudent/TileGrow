@@ -1,65 +1,96 @@
-// Tes keamanan server TileGrow v1.0.1 (24 kasus). Jalankan server dengan data kosong dulu:
-//   HOST=127.0.0.1 PORT=8095 DATA_DIR=/tmp/tg-test node server/server.js
-//   node tests/server-security.test.mjs
-const U='ws://127.0.0.1:8095/ws'; let pass=0, fail=0;
-const ok=(name,cond,extra='')=>{ cond?pass++:fail++; console.log((cond?'PASS ':'FAIL ')+name+(extra?'  '+extra:'')); };
-const open=()=>new Promise(r=>{const w=new WebSocket(U);w.q=[];w.onmessage=e=>w.q.push(JSON.parse(e.data));w.onopen=()=>r(w);});
-const wait=(w,t,ms=2500)=>new Promise(res=>{const s=Date.now();const i=setInterval(()=>{const k=w.q.findIndex(m=>m.t===t);if(k>=0){clearInterval(i);res(w.q.splice(k,1)[0]);}else if(Date.now()-s>ms){clearInterval(i);res(null);}},15);});
-const S=(w,o)=>w.send(JSON.stringify(o));
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// Tes keamanan server TileGrow v1.3 (protokol 'act': server yang mengubah world & tas).
+// Pengganti tes v1.0.1: aturan yang sama (lock, pintu utama, data rusak, pakaian palsu, brute force) diuji lewat jalur baru,
+// ditambah: pesan 'ops' lama ditolak, file server tidak bisa diunduh, item yang tidak dimiliki tidak bisa dipakai.
+//   node tests/run-v13.mjs security
+const PORT = process.env.TPORT || 8095, U = 'ws://127.0.0.1:' + PORT + '/ws', H = 'http://127.0.0.1:' + PORT;
+let pass = 0, fail = 0;
+const ok = (name, cond, extra = '') => { cond ? pass++ : fail++; console.log((cond ? 'PASS ' : 'FAIL ') + name + (extra ? '  ' + extra : '')); };
+const open = () => new Promise(r => { const w = new WebSocket(U); w.q = []; w.onmessage = e => w.q.push(JSON.parse(e.data)); w.onopen = () => r(w); });
+const wait = (w, t, ms = 2500, pred) => new Promise(res => { const s = Date.now(); const i = setInterval(() => {
+  const k = w.q.findIndex(m => m.t === t && (!pred || pred(m))); if (k >= 0){ clearInterval(i); res(w.q.splice(k, 1)[0]); } else if (Date.now() - s > ms){ clearInterval(i); res(null); } }, 10); });
+const S = (w, o) => w.send(JSON.stringify(o));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const drain = w => { w.q.length = 0; };
+const COLS = 100, N = 6000, at = (x, y) => y * COLS + x;
+const posAt = (w, tx, ty) => S(w, {t: 'pos', s: {x: tx * 32 + 3, y: ty * 32 + 2, vx: 0, vy: 0, f: 1, g: true, held: 'fist', worn: {}}});
+const tileAfter = async (w, i, ms = 900) => { await sleep(ms); const o = w.q.filter(m => m.t === 'ops').flatMap(m => m.ops).filter(o => o[0] === i); return o.length ? o[o.length - 1] : null; };
+const hitN = async (w, i, n) => { for (let k = 0; k < n; k++){ S(w, {t: 'act', a: 'hit', i}); await sleep(140); } };
 
-// 1. URL rusak
-let r=await fetch('http://127.0.0.1:8095/%E0%A4%A'); ok('URL rusak -> 400', r.status===400, r.status);
-r=await fetch('http://127.0.0.1:8095/'); ok('server masih hidup', r.status===200);
+// 1. HTTP
+let r = await fetch(H + '/%E0%A4%A'); ok('URL rusak -> 400', r.status === 400, r.status);
+r = await fetch(H + '/'); ok('server masih hidup', r.status === 200);
+r = await fetch(H + '/server/data/accounts.json'); ok('file data tidak bisa diunduh', r.status === 404);
+r = await fetch(H + '/server/server.js'); ok('kode server tidak bisa diunduh', r.status === 404);
 
-const a=await open(), b=await open();
-S(a,{t:'register',user:'alice1',pass:'secret12',flag:'ID'}); ok('register A',(await wait(a,'auth')).ok);
-S(b,{t:'register',user:'bob1',pass:'secret12',flag:'MY'}); ok('register B',(await wait(b,'auth')).ok);
-const N=6000, fgArr=Array(N).fill(0); for(let i=3000;i<N;i++) fgArr[i]=1; fgArr[2950]=23; for(let i=5900;i<N;i++) fgArr[i]=7;
-fgArr[2900]=30; // world lock milik A, ditulis A sendiri saat create
-const world={fg:fgArr,bgw:Array(N).fill(0),trees:[],meta:[[2900,{lock:{type:'world',owner:'alice1',access:[],public:false,ignoreAir:false,tiles:null}}]],spawn:{x:50,y:29}};
-S(a,{t:'join',name:'TEST'}); await wait(a,'needWorld');
-S(a,{t:'create',name:'TEST',world}); const aw=await wait(a,'world'); ok('A create world + WL tersimpan', aw && aw.data.meta.length===1);
-S(b,{t:'join',name:'TEST'}); await wait(b,'world'); await wait(a,'pjoin');
-
-// 2. B coba pecah block di world ber-WL milik A
-S(b,{t:'ops',ops:[[3100,0,0,null,null]]}); let rb=await wait(b,'ops'); let ra=await wait(a,'ops',600);
-ok('tamu pecah block di WL ditolak', rb && rb.denied===1 && rb.ops[0][1]===1, JSON.stringify(rb&&rb.ops[0]));
-ok('A tidak menerima op tamu', ra===null);
-// 3. B coba hapus/ambil alih WL
-S(b,{t:'ops',ops:[[2900,30,0,{lock:{type:'world',owner:'bob1',access:[],public:false,ignoreAir:false,tiles:null}},null]]}); rb=await wait(b,'ops');
-ok('ambil alih WL ditolak', rb && rb.denied===1);
-// 4. A sendiri boleh pecah
-S(a,{t:'ops',ops:[[3100,0,0,null,null]]}); ra=await wait(a,'ops'); rb=await wait(b,'ops');
-ok('pemilik boleh pecah', ra && ra.denied===0 && rb && rb.ops[0][1]===0);
-// 5. A beri akses ke bob1
-S(a,{t:'ops',ops:[[2900,30,0,{lock:{type:'world',owner:'alice1',access:['bob1'],public:false,ignoreAir:false,tiles:null}},null]]}); ra=await wait(a,'ops'); await wait(b,'ops');
-ok('pemilik ubah daftar akses', ra && ra.denied===0);
-S(b,{t:'ops',ops:[[3101,0,0,null,null]]}); rb=await wait(b,'ops'); ok('B dengan akses boleh pecah', rb && rb.denied===0); await wait(a,'ops');
-// 6. pintu utama & bedrock tidak bisa dihapus (bahkan pemilik)
-S(a,{t:'ops',ops:[[2950,0,0,null,null],[5950,0,0,null,null]]}); ra=await wait(a,'ops'); ok('pintu utama & dasar dilindungi', ra && ra.denied===2);
-// 7. meta rusak (sign tanpa text / lock pada block dirt) ditolak
-S(a,{t:'ops',ops:[[2800,20,0,{sign:{text:123}},null],[2801,1,0,{lock:{type:'world',owner:'alice1',access:[],public:false}},null],[2802,99,0,null,null]]}); ra=await wait(a,'ops');
-ok('meta rusak / block tak dikenal ditolak', ra && ra.denied===3);
-// 8. sign valid diterima
-S(a,{t:'ops',ops:[[2800,20,0,{sign:{text:'<img src=x onerror=alert(1)>'}},null]]}); ra=await wait(a,'ops'); ok('sign valid diterima', ra && ra.denied===0); await wait(b,'ops');
-// 9. pohon valid / tidak valid
-S(a,{t:'ops',ops:[[2803,8,0,null,{kind:1,t0:Date.now()}],[2804,8,0,null,{kind:999,t0:1}]]}); ra=await wait(a,'ops'); ok('pohon valid diterima, kind palsu ditolak', ra && ra.denied===1); await wait(b,'ops');
-// 10. worn dibersihkan
-S(a,{t:'pos',s:{x:1,y:2,worn:{hat:'h_cowboy',evil:{a:1},wings:{x:1}}}}); const pb=await wait(b,'pos'); ok('worn dibersihkan', pb && JSON.stringify(pb.s.worn)==='{"hat":"h_cowboy"}', JSON.stringify(pb&&pb.s.worn));
-// 11. world tanpa WL: small lock milik B, A tak bisa pecah
-const c=await open(); S(c,{t:'login',user:'bob1',pass:'secret12'}); ok('login B kedua',(await wait(c,'auth')).ok); ok('koneksi B lama di-kick', !!(await wait(b,'kicked')));
-const w2={fg:fgArr.map((v,i)=>i===2900?0:v),bgw:Array(N).fill(0),trees:[],meta:[],spawn:{x:50,y:29}};
-S(c,{t:'join',name:'FREE'}); await wait(c,'needWorld'); S(c,{t:'create',name:'FREE',world:w2}); await wait(c,'world');
-S(c,{t:'ops',ops:[[2910,31,0,{lock:{type:'small',owner:'bob1',access:[],public:false,ignoreAir:false,tiles:[3010,3011,3009]}},null]]}); let rc=await wait(c,'ops'); ok('B pasang small lock', rc && rc.denied===0);
-S(a,{t:'join',name:'FREE'}); await wait(a,'world'); await wait(c,'pjoin');
-S(a,{t:'ops',ops:[[3010,0,0,null,null],[3200,0,0,null,null]]}); ra=await wait(a,'ops'); ok('A: tile ter-lock ditolak, tile bebas boleh', ra && ra.denied===1 && ra.ops[1][1]===0);
-S(a,{t:'ops',ops:[[2930,30,0,{lock:{type:'world',owner:'alice1',access:[],public:false,ignoreAir:false,tiles:null}},null]]}); ra=await wait(a,'ops'); ok('A pasang WL di world yang ada lock B ditolak', ra && ra.denied===1);
-// 12. brute force login
-const d=await open(); let blocked=false;
-for(let i=0;i<7;i++){ S(d,{t:'login',user:'alice1',pass:'wrong'+i}); const x=await wait(d,'auth'); if(x && /Terlalu banyak/.test(x.err)) blocked=true; }
+const a = await open(), b = await open();
+S(a, {t: 'register', user: 'alice1', pass: 'secret12', flag: 'ID'}); ok('register A', (await wait(a, 'auth')).ok);
+S(b, {t: 'register', user: 'bob1', pass: 'secret12', flag: 'MY'}); ok('register B', (await wait(b, 'auth')).ok);
+const fgArr = Array(N).fill(0); for (let i = 3000; i < N; i++) fgArr[i] = 1; fgArr[2950] = 23; fgArr[3050] = 7; for (let i = 5900; i < N; i++) fgArr[i] = 7;
+S(a, {t: 'join', name: 'TEST', world: {fg: fgArr, bgw: Array(N).fill(0), trees: [], meta: [], spawn: {x: 50, y: 29}}}); await wait(a, 'world');
+posAt(a, 50, 29); await sleep(60);
+// 2. pesan 'ops' lama (dulu bisa menulis world mentah) ditolak
+drain(a); S(a, {t: 'ops', ops: [[3100, 0, 0, null, null]]}); const er = await wait(a, 'err'); ok("pesan 'ops' lama ditolak", er && /Versi game lama/.test(er.text));
+// 3. A beli + pasang World Lock
+S(a, {t: 'chat', text: '/testgive gem 1000'}); await sleep(100); S(a, {t: 'buy', key: 'b30'}); await sleep(150);
+drain(a); S(a, {t: 'act', a: 'place', i: at(51, 29), key: 'b30'}); let o = await tileAfter(a, at(51, 29));
+ok('A pasang World Lock', o && o[1] === 30 && o[3] && o[3].lock.owner === 'alice1');
+S(b, {t: 'join', name: 'TEST'}); await wait(b, 'world'); await wait(a, 'pjoin'); posAt(b, 52, 29); await sleep(60);
+// 4. tamu pecah block di WL
+drain(b); drain(a); await hitN(b, at(52, 30), 3); o = await tileAfter(b, at(52, 30));
+ok('tamu pecah block di WL ditolak', o && o[1] === 1, JSON.stringify(o));
+ok('A tidak menerima perubahan dari tamu', !a.q.some(m => m.t === 'ops' && m.ops.some(x => x[0] === at(52, 30) && x[1] === 0)));
+// 5. tamu ubah WL lewat dialog wrench
+drain(b); S(b, {t: 'act', a: 'meta', i: at(51, 29), meta: {lock: {type: 'world', owner: 'bob1', access: [], public: true, ignoreAir: false, tiles: null}}});
+o = await tileAfter(b, at(51, 29)); ok('ambil alih WL ditolak', o && o[3].lock.owner === 'alice1' && !o[3].lock.public);
+// 6. tamu pukul WL
+drain(b); await hitN(b, at(51, 29), 6); o = await tileAfter(b, at(51, 29)); ok('tamu tidak bisa pecah WL', o && o[1] === 30);
+// 7. pemilik boleh pecah
+drain(a); drain(b); await hitN(a, at(49, 30), 3); o = await tileAfter(b, at(49, 30)); ok('pemilik boleh pecah, pemain lain melihat', o && o[1] === 0);
+// 8. A beri akses ke bob1
+drain(a); S(a, {t: 'act', a: 'meta', i: at(51, 29), meta: {lock: {type: 'world', owner: 'alice1', access: ['bob1'], public: false, ignoreAir: false, tiles: null}}});
+o = await tileAfter(a, at(51, 29)); ok('pemilik ubah daftar akses', o && o[3].lock.access.includes('bob1'));
+drain(b); await hitN(b, at(53, 30), 3); o = await tileAfter(b, at(53, 30)); ok('B dengan akses boleh pecah', o && o[1] === 0);
+// 9. pintu utama & dasar
+drain(a); await hitN(a, at(50, 29), 6); await hitN(a, at(50, 30), 6); await sleep(300);
+ok('pintu utama & dasar dilindungi', !a.q.some(m => m.t === 'ops' && m.ops.some(x => (x[0] === at(50, 29) || x[0] === at(50, 30)) && x[1] === 0)));
+// 10. meta rusak, block terlarang, item yang tidak dimiliki
+S(a, {t: 'buy', key: 'b20'}); await sleep(150);
+drain(a); S(a, {t: 'act', a: 'place', i: at(48, 29), key: 'b20'}); await tileAfter(a, at(48, 29), 300);
+drain(a); S(a, {t: 'act', a: 'meta', i: at(48, 29), meta: {sign: {text: 123}}}); o = await tileAfter(a, at(48, 29));
+ok('meta rusak ditolak', o && o[3] && o[3].sign && o[3].sign.text === '');
+drain(a); S(a, {t: 'act', a: 'meta', i: at(48, 29), meta: {sign: {text: '<img src=x onerror=alert(1)>'}}}); o = await tileAfter(a, at(48, 29));
+ok('teks papan disimpan sebagai teks', o && o[3].sign.text === '<img src=x onerror=alert(1)>');
+drain(a); S(a, {t: 'act', a: 'place', i: at(47, 29), key: 'b99'}); S(a, {t: 'act', a: 'place', i: at(47, 29), key: 'b7'}); S(a, {t: 'act', a: 'place', i: at(47, 29), key: 'b23'});
+o = await tileAfter(a, at(47, 29), 500); ok('block tak dikenal / dasar / pintu utama tidak bisa dipasang', !o || o[1] === 0);
+drain(a); S(a, {t: 'act', a: 'place', i: at(47, 29), key: 'b11'}); o = await tileAfter(a, at(47, 29), 500);
+ok('item yang tidak ada di tas tidak bisa dipasang', !o || o[1] === 0);
+// 11. pohon (tile 47,29: dalam jangkauan, tanah di bawahnya)
+drain(a); S(a, {t: 'act', a: 'seed', i: at(47, 29), key: 's14'}); o = await tileAfter(a, at(47, 29), 400); ok('seed yang tidak dimiliki ditolak', !o || o[1] === 0);
+drain(a); S(a, {t: 'act', a: 'seed', i: at(47, 29), key: 's1'}); o = await tileAfter(a, at(47, 29));
+ok('tanam seed yang dimiliki', o && o[1] === 8 && o[4].kind === 1);
+drain(a); await hitN(a, at(47, 29), 1); o = await tileAfter(a, at(47, 29), 400); ok('pohon belum matang tidak bisa dipanen', !o || o[1] === 8);
+// 12. pakaian palsu dibuang dari state
+drain(b); S(a, {t: 'pos', s: {x: 50 * 32 + 3, y: 29 * 32 + 2, worn: {hat: 'h_cowboy', evil: {a: 1}, wings: {x: 1}}}}); const pb = await wait(b, 'pos');
+ok('pakaian yang tidak dimiliki / rusak dibuang', pb && JSON.stringify(pb.s.worn) === '{}', JSON.stringify(pb && pb.s.worn));
+// 13. small lock milik B, A tak bisa pecah
+const c = await open(); S(c, {t: 'login', user: 'bob1', pass: 'secret12'}); ok('login B kedua', (await wait(c, 'auth')).ok); ok('koneksi B lama di-kick', !!(await wait(b, 'kicked')));
+S(c, {t: 'join', name: 'FREE', world: {fg: fgArr, bgw: Array(N).fill(0), trees: [], meta: [], spawn: {x: 50, y: 29}}}); await wait(c, 'world'); posAt(c, 50, 29); await sleep(60);
+S(c, {t: 'chat', text: '/testgive gem 500'}); await sleep(100); S(c, {t: 'buy', key: 'b31'}); await sleep(150);
+drain(c); S(c, {t: 'act', a: 'place', i: at(52, 29), key: 'b31'}); o = await tileAfter(c, at(52, 29));
+ok('B pasang small lock (tile diklaim server)', o && o[1] === 31 && o[3].lock.tiles.length === 10);
+S(a, {t: 'join', name: 'FREE'}); await wait(a, 'world'); posAt(a, 50, 29); await sleep(60);
+const locked = o[3].lock.tiles.find(t => t >= 3000), free = at(47, 31);
+drain(a); await hitN(a, locked, 3); await hitN(a, free, 3); await sleep(300);
+const lockedHit = a.q.some(m => m.t === 'ops' && m.ops.some(x => x[0] === locked && x[1] === 0)), freeHit = a.q.some(m => m.t === 'ops' && m.ops.some(x => x[0] === free && x[1] === 0));
+ok('A: tile ter-lock ditolak, tile bebas boleh', !lockedHit && freeHit, 'locked=' + lockedHit + ' free=' + freeHit);
+S(a, {t: 'chat', text: '/testgive b30 1'}); await sleep(100);
+drain(a); S(a, {t: 'act', a: 'place', i: at(49, 29), key: 'b30'}); o = await tileAfter(a, at(49, 29), 500);
+ok('A pasang WL di world yang ada lock B ditolak', !o || o[1] === 0);
+drain(a); S(a, {t: 'join', name: 'BARU'}); const nw = await wait(a, 'world'); ok('world baru tanpa data klien dibuat server', nw && nw.data.fg.includes(23));
+// 14. brute force
+const d = await open(); let blocked = false;
+for (let i = 0; i < 7; i++){ S(d, {t: 'login', user: 'alice1', pass: 'wrong' + i}); const x = await wait(d, 'auth'); if (x && /Terlalu banyak/.test(x.err)) blocked = true; }
 ok('brute force diblokir setelah 5 gagal', blocked);
-S(d,{t:'login',user:'alice1',pass:'secret12'}); const x=await wait(d,'auth'); ok('password benar pun ditahan selama blokir', x && !x.ok);
-// 13. server tetap responsif saat banyak login (async scrypt)
-const t0=Date.now(); const e=await open(); S(e,{t:'hello'}); const hi=await wait(e,'hi'); ok('hello dijawab cepat', hi && Date.now()-t0<500, (Date.now()-t0)+'ms');
-console.log(`\n${pass} lulus, ${fail} gagal`); process.exit(fail?1:0);
+S(d, {t: 'login', user: 'alice1', pass: 'secret12'}); const x = await wait(d, 'auth'); ok('password benar pun ditahan selama blokir', x && !x.ok);
+const t0 = Date.now(); const e = await open(); S(e, {t: 'hello'}); const hi = await wait(e, 'hi'); ok('hello dijawab cepat', hi && Date.now() - t0 < 500, (Date.now() - t0) + 'ms');
+console.log(`\n${pass} lulus, ${fail} gagal`); process.exit(fail ? 1 : 0);

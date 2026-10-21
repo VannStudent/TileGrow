@@ -210,9 +210,14 @@ function say(kind, text){
 }
 function playerSay(text){
   const t = String(text||'').trim().slice(0,120); if (!t) return;
-  if (t[0] === '/') return chatCommand(t);
+  if (t[0] === '/' && !(online() && !['/help', '/worlds', '/who', '/warp', '/world'].includes(t.split(' ')[0].toLowerCase()))) return chatCommand(t);
+  if (online()){
+    // command (/...) diproses server; command staff hanya jalan untuk Moderator/Developer
+    if (t[0] === '/' && !['/help', '/worlds', '/who', '/warp', '/world'].includes(t.split(' ')[0].toLowerCase())){ netSend({t: 'chat', text: t}); return; }
+    if (t[0] !== '/'){ chat.push({kind: 'me', text: (net.display || who()) + ': ' + t, t: Date.now(), role: net.role}); if (chat.length > 120) chat.shift(); renderChat();
+      netSend({t: 'chat', text: t}); bubble = {text: t, t0: Date.now(), until: Date.now() + 2500 + t.length*90}; return; }
+  }
   say('me', who() + ': ' + t);
-  if (online()) netSend({t: 'chat', text: t});
   bubble = {text: t, t0: Date.now(), until: Date.now() + 2500 + t.length*90};   // balon chat di atas kepala
 }
 let bubble = null;
@@ -223,7 +228,7 @@ function chatCommand(line){
   if (c === 'warp' || c === 'world'){ if (!arg) return say('sys','Pakai: /warp NAMA'); return gotoWorld(arg); }
   if (c === 'worlds') return online() ? say('sys', 'World di server: ' + net.worldList.map(w => w.name).join(', ')) : say('sys', 'World kamu: ' + worldList().join(', '));
   if (c === 'who' && online()) return say('sys', 'Di world ini: ' + [who(), ...[...net.players.values()].map(r => r.name)].join(', '));
-  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, ' + (online() ? '/who, ' : '') + '/help');
+  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, ' + (online() ? '/who, ' : '') + '/help' + (online() && net.role !== 'player' ? ' · staff: /staffhelp' : ''));
   say('sys', 'Perintah tidak dikenal: /' + c);
 }
 function setPlayerName(n){
@@ -241,7 +246,7 @@ function toggleWear(key){
   const w = WEAR[key]; if (!w) return;
   if (worn[w.slot] === key){ worn[w.slot] = null; say('sys', w.name + ' dilepas.'); }
   else {
-    worn[w.slot] = key; questEvent('wear', null, 1);
+    worn[w.slot] = key; questEvent('wear', null, 1); if (online()) netSend({t:'stat', k:'wear'});
     say('sys', w.name + ' dipakai.' + (w.jumps ? ' Lompat ' + w.jumps + ' kali.' : ''));
   }
   refreshUI();

@@ -15,7 +15,7 @@ addEventListener('keydown', e=>{
   if (e.code === 'KeyG'){ profTab = 'bestiary'; toggleModal('prof'); }
   if (e.code === 'Escape'){ if (anyUIOpen()) closeModals(); else if (invRows) setInvRows(0); else { renderMenu(); openModal('menu'); } }
   if (e.code === 'Equal' || e.code === 'NumpadAdd') setZoom(zoom + .25);
-  if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(zoom - .25);
+  if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(zoom - .25 < ZOOM_MIN && online() && net.staff.zoom ? staffZoomMin() : zoom - .25);
   if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', e=> keys[e.code] = false);
@@ -28,7 +28,7 @@ cv.addEventListener('mousemove', e=>{
 });
 cv.addEventListener('mousedown', e=>{ if (anyUIOpen()) return closeModals(); mouse.down = true; mouse.btn = e.button; actCool = 0; act(); });
 addEventListener('mouseup', ()=> mouse.down = false);
-cv.addEventListener('wheel', e=>{ e.preventDefault(); setZoom(zoom + (e.deltaY < 0 ? .25 : -.25)); }, {passive:false});
+cv.addEventListener('wheel', e=>{ e.preventDefault(); const z = zoom + (e.deltaY < 0 ? .25 : -.25); setZoom(z < ZOOM_MIN && online() && net.staff.zoom ? (e.deltaY < 0 ? ZOOM_MIN : staffZoomMin()) : z); }, {passive:false});
 
 // ---------- simpan / muat ----------
 function save(){
@@ -88,7 +88,7 @@ function frame(now){
 }
 
 function boot(){
-  bindUI(); bindScreens(); bindControlPicker(); bindTouch();
+  bindUI(); bindScreens(); bindControlPicker(); bindTouch(); bindSocial();
   genWorld();                 // world latar untuk layar judul (bukan save siapa pun)
   rollQuests();
   const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom || ZOOM_MIN)); zoom = 0; setZoom(z);

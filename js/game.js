@@ -41,6 +41,8 @@ function touches(id){
 function physicsStep(){
   pl.px = pl.x; pl.py = pl.y;                       // posisi lama untuk interpolasi
   if (pl.dead > 0){ pl.dead -= DT; if (pl.dead <= 0) respawn('Kamu respawn di pintu utama.'); return; }
+  if (online() && net.frozen){ pl.vx = pl.vy = 0; return; }                     // dibekukan moderator
+  if (online() && net.staff.noclip){ noclipStep(); return; }                      // staff: terbang menembus block
   const lock = anyUIOpen();
   const left = !lock && (keys.KeyA || keys.ArrowLeft), right = !lock && (keys.KeyD || keys.ArrowRight);
   const want = (right?1:0) - (left?1:0);
@@ -52,7 +54,7 @@ function physicsStep(){
   if (jumpKey && !pl.jumpHeld) pl.buffer = BUFFER_T;
   pl.jumpHeld = jumpKey; pl.buffer = Math.max(0, pl.buffer - DT);
   if (pl.onGround) jumpsLeft = maxJumps() - 1;
-  if (pl.buffer > 0 && pl.coyote > 0){ pl.vy = -JUMP_V; pl.onGround = false; pl.coyote = 0; pl.buffer = 0; pl.baseY = pl.y; sfx('jump'); questEvent('jump',null,1); }
+  if (pl.buffer > 0 && pl.coyote > 0){ pl.vy = -JUMP_V; pl.onGround = false; pl.coyote = 0; pl.buffer = 0; pl.baseY = pl.y; sfx('jump'); questEvent('jump',null,1); if (online()) netSend({t:'stat', k:'jump'}); }
   else if (pl.buffer > 0 && !pl.onGround && jumpsLeft > 0 && jumpKey){
     // lompatan kedua (sayap): +3 block di atas puncak lompatan pertama → total ±6 block dari tanah.
     // Kalau ditekan saat sudah turun, tetap naik minimal 3 block dari posisi sekarang.
@@ -106,6 +108,17 @@ function physicsStep(){
   if (actCool > 0) actCool = Math.max(0, actCool - DT);
 }
 
+// noclip (Moderator/Developer): WASD terbang bebas, tembus block, tidak kena lava
+function noclipStep(){
+  const lock = anyUIOpen(), sp = (keys.ShiftLeft || keys.ShiftRight) ? 900 : 420;
+  const ix = lock ? 0 : ((keys.KeyD || keys.ArrowRight) ? 1 : 0) - ((keys.KeyA || keys.ArrowLeft) ? 1 : 0);
+  const iy = lock ? 0 : ((keys.KeyS || keys.ArrowDown) ? 1 : 0) - ((keys.KeyW || keys.ArrowUp || keys.Space) ? 1 : 0);
+  pl.vx = ix * sp; pl.vy = iy * sp; if (ix) pl.face = ix;
+  pl.x = Math.max(0, Math.min(COLS*TS - pl.w, pl.x + pl.vx*DT)); pl.y = Math.max(0, Math.min(ROWS*TS - pl.h, pl.y + pl.vy*DT));
+  pl.onGround = false; pl.hurt = 0; pl.kb = 0;
+  if (pl.swing > 0) pl.swing = Math.max(0, pl.swing - DT);
+  if (actCool > 0) actCool = Math.max(0, actCool - DT);
+}
 function dangerTouching(){
   const x0 = Math.floor((pl.x-1.5)/TS), x1 = Math.floor((pl.x+pl.w+1)/TS), y0 = Math.floor((pl.y-1.5)/TS), y1 = Math.floor((pl.y+pl.h+1)/TS);
   for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++){ const d = BY_ID[tileAt(x,y)]; if (d && d.danger) return {x, y}; }
@@ -116,7 +129,7 @@ function hurtPlayer(src){
   const cx = (src.x + .5) * TS, dir = (pl.x + pl.w/2) >= cx ? 1 : -1;
   pl.kb = dir * KNOCK_DIST; pl.vy = -LAVA_BOUNCE; pl.onGround = false;
   burst(pl.x + pl.w/2, pl.y + pl.h, '#ff8a2b', 10); sfx('hurt'); shake(5);
-  if (pl.hp <= 0){ pl.dead = 1.2; prog.stats.deaths++; burst(pl.x + pl.w/2, pl.y + pl.h/2, '#ff9494', 30); say('sys','Kamu mati. Respawn di pintu utama.'); }
+  if (pl.hp <= 0){ pl.dead = 1.2; if (online()) netSend({t:'stat', k:'death'}); else prog.stats.deaths++; burst(pl.x + pl.w/2, pl.y + pl.h/2, '#ff9494', 30); say('sys','Kamu mati. Respawn di pintu utama.'); }
 }
 // efek kepakan sayap: bulu/serpih yang menyebar ke bawah + cincin angin
 function wingBurst(){
@@ -140,11 +153,13 @@ function updateCamera(alpha){
 }
 function lerp(a,b,t){ return a + (b-a)*t; }
 function clampCam(){
-  camX = Math.max(0, Math.min(camX, COLS*TS - VW/zoom));
-  cam  = Math.max(0, Math.min(cam,  ROWS*TS - VH/zoom));
+  // zoom satu world (staff): world lebih kecil dari layar, taruh di tengah
+  camX = COLS*TS <= VW/zoom ? (COLS*TS - VW/zoom)/2 : Math.max(0, Math.min(camX, COLS*TS - VW/zoom));
+  cam  = ROWS*TS <= VH/zoom ? (ROWS*TS - VH/zoom)/2 : Math.max(0, Math.min(cam,  ROWS*TS - VH/zoom));
 }
 function setZoom(z){
-  const nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z*4)/4));
+  const zmin = typeof staffZoomMin === 'function' ? staffZoomMin() : ZOOM_MIN;
+  const nz = Math.max(zmin, Math.min(ZOOM_MAX, zmin < ZOOM_MIN && z < ZOOM_MIN ? z : Math.round(z*4)/4));
   if (nz === zoom) return;
   const oz = zoom || nz, cx = camX + VW/oz/2, cy = cam + VH/oz/2;
   zoom = nz; camX = cx - VW/zoom/2; cam = cy - VH/zoom/2; clampCam();
@@ -166,6 +181,9 @@ function overlapsPlayer(tx,ty){ return pl.x < (tx+1)*TS && pl.x + pl.w > tx*TS &
 function act(){
   if (actCool > 0 || pl.dead > 0) return;
   const {x:tx, y:ty} = mouseTile(), w = worldMouse();
+  // ikon kunci inggris di samping nama pemain lain: buka menu pemain (Trade / Tambah Teman / Report)
+  if (online() && selected().key === WRENCH){ const r = remoteWrenchHit(w.x, w.y); if (r){ actCool = .2; return openPlayerMenu(r); } }
+  if (online() && net.frozen) return toast('Kamu sedang dibekukan.');
   if (!inWorld(tx,ty)) return;
   pl.swingAng = Math.atan2(w.y - (pl.y + 12), w.x - (pl.x + pl.w/2));
   pl.face = w.x >= pl.x + pl.w/2 ? 1 : -1;
@@ -182,6 +200,12 @@ function denied(){ toast('Area ini dikunci. Kamu tidak punya akses.'); sfx('deny
 function placeBlock(tx,ty,d){
   const def = BY_ID[d.id], i = idx(tx,ty);
   if (!canBuild(tx,ty)) return denied();
+  // online (v1.3): server yang memasang & mengambil item dari tas; di sini hanya cek ringan + efek
+  if (online()){
+    if (def.bg ? bgw[i] : tileAt(tx,ty) !== 0) return;
+    if (def.solid && overlapsPlayer(tx,ty)) return toast('Tidak bisa pasang di tempatmu berdiri.');
+    sfx('place'); return netAct('place', i, 'b' + d.id);
+  }
   if (def.bg){                                     // dinding belakang
     if (bgw[i]) return;
     if (!takeItem('b'+d.id,1)) return;
@@ -219,6 +243,7 @@ function placeBlock(tx,ty,d){
 function useSeed(tx,ty,d){
   const i = idx(tx,ty), id = tileAt(tx,ty);
   if (!canBuild(tx,ty)) return denied();
+  if (online()){ if (id !== 0 && id !== 8) return; sfx('place'); return netAct('seed', i, 's' + d.id); }
   if (id === 8){
     const tr = trees.get(i);
     if (tr.spliced) return toast('Pohon ini sudah hasil splice.');
@@ -240,10 +265,20 @@ function punch(tx,ty){
   if (id === 0){
     if (!bgw[i]) return;
     if (!canBuild(tx,ty)) return denied();
+    if (online()){ const k = 'g' + i, dd = dmg.get(k) || {n:0, x:tx, y:ty, bg:true}; dd.n++; dd.t = Date.now(); dmg.set(k, dd); puff(tx,ty,bgw[i],3); sfx('hit'); return netAct('hit', i); }
     return hitTile(tx,ty,bgw[i],true);
   }
   if (id === 7 || id === 23) return toast(id === 7 ? 'Block dasar tidak bisa dipecah.' : 'Pintu utama tidak bisa dipecah.');
   if (!canBuild(tx,ty)) return denied();
+  if (online()){
+    // efek pukulan di layar; server menghitung jumlah pukulan, drop, dan XP
+    const m0 = meta.get(i);
+    if (m0 && m0.lock && m0.lock.owner !== who()) return denied();
+    if (id === 8){ const tr = trees.get(i); if (tr && Date.now() - tr.t0 < GROW_MS[tr.kind]) return toast('Pohon belum siap dipanen.'); }
+    const k = 'f' + i, dd = dmg.get(k) || {n:0, x:tx, y:ty, bg:false}; dd.n++; dd.t = Date.now(); dmg.set(k, dd);
+    puff(tx,ty,id,3); sfx('hit'); shake(1.5);
+    return netAct('hit', i);
+  }
   const m = meta.get(i);
   if (m && m.lock && m.lock.owner !== who()) return denied();
   if (m && m.display && m.display.key){             // ambil item dari kotak pajang dulu
@@ -292,8 +327,8 @@ function hitTile(tx,ty,id,isBg){
 const GEM_TIERS = [[100,'#1f3fbf','#7f9cff'],[50,'#8a3fd6','#e0b8ff'],[25,'#e03a3a','#ffb0b0'],[5,'#f2c230','#fff2a0'],[1,'#3fa8f0','#c8ecff']];
 function gemTier(n){ for (const t of GEM_TIERS) if (n >= t[0]) return t; return GEM_TIERS[GEM_TIERS.length-1]; }
 function mergeGems(){
-  for (let a=0;a<items.length;a++){ const A = items[a]; if (A.key !== 'gem' || A.vy !== 0) continue;
-    for (let b=items.length-1;b>a;b--){ const B = items[b]; if (B.key !== 'gem' || B.vy !== 0) continue;
+  for (let a=0;a<items.length;a++){ const A = items[a]; if (A.key !== 'gem' || A.vy !== 0 || A.sid) continue;
+    for (let b=items.length-1;b>a;b--){ const B = items[b]; if (B.key !== 'gem' || B.vy !== 0 || B.sid) continue;
       if (Math.abs(A.x - B.x) < 14 && Math.abs(A.y - B.y) < 10){ A.n += B.n; A.x = (A.x + B.x)/2; items.splice(b,1); } } }
 }
 function spawnDrop(tx,ty,key,n){
@@ -303,12 +338,14 @@ function spawnDrop(tx,ty,key,n){
 // drop selalu lewat dialog konfirmasi (askDrop di ui.js) supaya tidak bisa spam drop tanpa sadar
 function dropSelected(n){
   const s = selected(); if (!s || s.key === FIST || s.key === WRENCH) return toast('Item ini tidak bisa di-drop.');
+  if (online()) return netSend({t: 'drop', key: s.key, n});
   const key = s.key, k = takeItem(key, n); if (!k) return;
   items.push({x: pl.x + pl.w/2 + pl.face*TS*1.2, y: pl.y + 6, vy:-120, vx:0, key, n:k, lock: Date.now() + 1500});
   toast(k + ' ' + itemDef(key).name + ' di-drop.'); say('act', 'Kamu men-drop ' + k + ' ' + itemDef(key).name + '.');
 }
 function trashSelected(n){
   const s = selected(); if (!s || s.key === FIST || s.key === WRENCH) return toast('Item ini tidak bisa dibuang.');
+  if (online()) return netSend({t: 'trash', key: s.key, n});
   const nm = itemDef(s.key).name, k = takeItem(s.key, n); if (k) toast(k + ' ' + nm + ' dibuang.');
 }
 
@@ -321,6 +358,10 @@ function updateWorld(){
     const ny = it.y + it.vy*DT;
     if (solidAt(Math.floor(it.x/TS), Math.floor((ny+7)/TS))){ it.vy = 0; it.y = Math.floor((ny+7)/TS)*TS - 7; } else it.y = ny;
     if (it.y > ROWS*TS){ items.splice(k,1); continue; }
+    if (it.sid){                                            // drop online: server yang memutuskan siapa dapat
+      if (pl.dead <= 0 && now > it.lock && Math.hypot(px-it.x, py-it.y) < 26 && now - (it.asked || 0) > 400){ it.asked = now; netSend({t: 'pickup', id: it.sid}); }
+      continue;
+    }
     if (pl.dead <= 0 && now > it.lock && Math.hypot(px-it.x, py-it.y) < 26){
       const got = addItem(it.key, it.n);
       if (got){ it.n -= got; if (it.n <= 0){ items.splice(k,1); sfx(it.key === 'gem' ? 'gem' : 'pick'); } }

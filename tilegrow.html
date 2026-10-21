@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>TileGrow v1.0</title>
+<title>TileGrow v1.3</title>
 <style>
   :root{ --bg:#0d1017; --line:#2c3447; --text:#eef2f8; --dim:#8d97ab; --accent:#ff9494; --ol:#17121c; }
   *{box-sizing:border-box}
@@ -449,6 +449,24 @@
   }
   @media (max-height:500px){ .gtb{width:42px;height:42px} .gtb svg,.gtb img{width:26px;height:26px} .gtR{gap:6px} .gtb.bub svg{width:40px;height:40px} }
   @media (pointer:coarse){ .gtR .zoom{display:none} }
+  /* v1.3: menu pemain, teman, report, trade */
+  .rrow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  .rr{padding:6px 10px;border-radius:99px;border:2px solid var(--ol);background:#2e3850;color:#cfe6ff;font-size:12px;font-weight:700;cursor:pointer}
+  .rr.on{background:#c0392b;color:#fff}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#6a7383;margin-right:6px;border:1.5px solid var(--ol)}
+  .dot.on{background:#3fe07a}
+  .tradeWin{width:min(620px,96vw)}
+  .trCols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .trCol{background:#101a2c;border:2px solid #2c4a6e;border-radius:10px;padding:6px;min-height:110px}
+  .trHead{font-size:12px;font-weight:800;display:flex;justify-content:space-between;margin-bottom:4px}
+  .trHead .ok{color:#7be37a}
+  .trList{display:flex;flex-direction:column;gap:3px;max-height:160px;overflow:auto}
+  .tri{display:flex;align-items:center;gap:6px;font-size:12px;background:#1a2740;border-radius:6px;padding:3px 6px}
+  .tri img{width:20px;height:20px;image-rendering:pixelated}
+  .tri span{flex:1}
+  .tri[data-k]{cursor:pointer} .tri[data-k]:hover{background:#3a2430}
+  #trBag{max-height:130px;overflow:auto}
+  .roleMod{color:#c07cff} .roleDev{color:#ff9a2e}
 </style>
 </head>
 <body>
@@ -522,6 +540,7 @@
         <button class="btn primary" id="mResume">Lanjut main</button>
         <button class="btn" id="mRespawn">Respawn ke pintu utama</button>
         <button class="btn" id="mWorlds">World saya / pindah world</button>
+        <button class="btn" id="mFriends">👥 Teman</button>
         <button class="btn" id="mLobby">🚪 Exit ke world lobby</button>
         <button class="btn" id="mControls">Kontrol: <b id="ctlNow">Keyboard &amp; Mouse</b></button>
         <button class="btn" id="mGuest">Main sebagai Tamu (tes lock)</button>
@@ -562,6 +581,50 @@
     <h2>🚪 Keluar dari world <span id="exName"></span>?</h2>
     <p class="note">Progres world ini tersimpan. Kamu akan kembali ke world lobby.</p>
     <div class="info" style="justify-content:flex-end"><button class="btn x">Tetap di sini</button><button class="btn primary" id="exOk">Keluar</button></div>
+  </div></div>
+
+  <!-- v1.3: menu pemain (klik ikon kunci inggris di samping nama pemain lain) -->
+  <div class="modal hidden" id="playerM"><div class="win card" style="width:min(360px,94vw)">
+    <h2><span id="pmFlag"></span> <span><span id="pmName">Pemain</span><br><span class="sub" id="pmSub"></span></span> <button class="btn x">Tutup</button></h2>
+    <div class="menuBtns">
+      <button class="btn primary" id="pmTrade">🤝 Trade</button>
+      <button class="btn" id="pmFriend">👥 Tambah Teman</button>
+      <button class="btn warn" id="pmReport">🚩 Report</button>
+    </div>
+  </div></div>
+  <div class="modal hidden" id="friendsM"><div class="win card" style="width:min(440px,94vw)">
+    <h2>👥 Teman <button class="btn x">Tutup</button></h2>
+    <div class="info" style="border:none;margin:0 0 8px;padding:0"><input id="frIn" maxlength="16" placeholder="Nama pemain" style="flex:1;width:auto"><button class="btn primary" id="frAdd">Tambah</button></div>
+    <div class="scroll" id="frList"></div>
+  </div></div>
+  <div class="modal hidden" id="reportM"><div class="win card" style="width:min(400px,94vw)">
+    <h2>🚩 Report <span id="rpName"></span></h2>
+    <p class="note">Laporan dikirim ke Moderator. Laporan palsu bisa membuatmu dikenai sanksi.</p>
+    <div class="rrow"><button class="rr on" data-r="cheat">Cheat / hack</button><button class="rr" data-r="kasar">Kata kasar</button><button class="rr" data-r="scam">Scam / penipuan</button><button class="rr" data-r="griefing">Merusak world</button><button class="rr" data-r="lainnya">Lainnya</button></div>
+    <label>Keterangan (opsional)</label><textarea id="rpNote" maxlength="200" rows="2"></textarea>
+    <div class="info" style="justify-content:flex-end"><button class="btn x">Batal</button><button class="btn warn" id="rpSend">Kirim Report</button></div>
+  </div></div>
+  <div class="modal hidden" id="tradeReqM"><div class="win card" style="width:min(360px,94vw)">
+    <h2>🤝 Permintaan trade</h2>
+    <p><b id="trqName"></b> ingin trade denganmu.</p>
+    <div class="info" style="justify-content:flex-end"><button class="btn" id="trqDecline">Tolak</button><button class="btn primary" id="trqAccept">Terima</button></div>
+  </div></div>
+  <div class="modal hidden" id="tradeM"><div class="win card tradeWin">
+    <h2>🤝 Trade dengan <span id="trWith"></span> <button class="btn" id="trCancel">Batal</button></h2>
+    <div class="trCols">
+      <div class="trCol"><div class="trHead">Tawaranmu <span id="trStMine"></span></div><div class="trList" id="trMine"></div></div>
+      <div class="trCol"><div class="trHead">Tawaran mereka <span id="trStTheirs"></span></div><div class="trList" id="trTheirs"></div></div>
+    </div>
+    <div id="trOffer">
+      <label>Tambah dari tas (klik: +1 · shift+klik: semua · klik di tawaranmu: −1)</label>
+      <div class="pickgrid" id="trBag"></div>
+      <div class="info" style="border:none;padding:0;margin:6px 0 0"><span>Gems</span><input type="number" id="trGems" min="0" placeholder="0" style="width:120px"><span style="flex:1"></span><button class="btn primary" id="trOk">Setuju</button></div>
+      <p class="note">Kalau ada yang mengubah tawaran, status Setuju kedua pihak otomatis batal.</p>
+    </div>
+    <div id="trConfirmBox" style="display:none">
+      <p class="warnBox" id="trSummary"></p>
+      <div class="info" style="justify-content:flex-end"><button class="btn primary" id="trConfirm" disabled>Konfirmasi Trade</button></div>
+    </div>
   </div></div>
 
   <div class="modal hidden" id="dlg"><div class="win card" style="width:min(460px,94vw)">
@@ -653,6 +716,7 @@
 <script src="js/screens.js"></script>
 <script src="js/controls.js"></script>
 <script src="js/net.js"></script>
+<script src="js/social.js"></script>
 <script>
   function fit(){ cv.width = innerWidth; cv.height = innerHeight; VW = cv.width; VH = cv.height; if (fg) clampCam(); }
   addEventListener('resize', fit); fit();
