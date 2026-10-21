@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TileGrow v1.0</title>
+<style>
+  :root{ --bg:#0d1017; --line:#2c3447; --text:#eef2f8; --dim:#8d97ab; --accent:#ff9494; --ol:#17121c; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,"Segoe UI",sans-serif;overflow:hidden}
+  #stage{position:relative;width:100vw;height:100vh;user-select:none}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated;cursor:crosshair}
+  .card{background:linear-gradient(180deg,#232b3d,#171c28);border:3px solid var(--ol);border-radius:12px;box-shadow:0 0 0 2px #3a4560 inset,0 6px 0 rgba(0,0,0,.35)}
+  .tl{position:absolute;left:12px;top:var(--tlTop,200px);padding:8px 12px;font-size:12px;line-height:1.5;pointer-events:none;min-width:170px}
+  .tl .wrenchBtn{pointer-events:auto}
+  .tl .lbl{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.6px}
+  .tl b{font-size:13px}
+  #hp{display:flex;gap:2px;margin-top:5px}
+  #hp i{width:12px;height:11px;display:block;background:#3a2530;clip-path:polygon(50% 100%,0 40%,0 15%,20% 0,50% 18%,80% 0,100% 15%,100% 40%)}
+  #hp i.on{background:#ff5a6e}
+  #guestTag{margin-top:6px;display:inline-block;padding:2px 7px;border-radius:999px;background:#2d6c8a;color:#d8f4ff;font-size:10px;font-weight:700}
+  .rstack{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  .stat{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;font-weight:700;font-size:15px;min-width:150px;justify-content:flex-end}
+  .stat img{width:22px;height:22px;image-rendering:pixelated}
+  .lvchip{display:flex;align-items:center;gap:8px;padding:6px 10px;min-width:150px}
+  .lvchip .lv{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a8,#e0a52a);border:3px solid var(--ol);display:flex;align-items:center;justify-content:center;font-weight:800;color:#3b2606;font-size:13px}
+  .lvchip .xp{flex:1}
+  .lvchip .xp small{display:block;color:var(--dim);font-size:10px;margin-bottom:3px;text-align:right}
+  .bar{height:7px;border-radius:99px;background:#0c0f16;border:2px solid var(--ol);overflow:hidden}
+  .bar > div{height:100%;background:linear-gradient(90deg,#7be37a,#c9f56a);transition:width .25s}
+  .icons{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+  .ib{position:relative;width:52px;height:52px;border-radius:12px;border:3px solid var(--ol);cursor:pointer;background:linear-gradient(180deg,#2e3850,#1d2333);box-shadow:0 0 0 2px #46526f inset,0 4px 0 rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text);font-size:9px;font-weight:700;gap:2px;transition:transform .08s}
+  .ib:hover{transform:translateY(-2px);box-shadow:0 0 0 2px var(--accent) inset,0 6px 0 rgba(0,0,0,.4)}
+  .ib:active{transform:translateY(1px)}
+  .ib svg{width:24px;height:24px}
+  .ib .badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:#ff5a6e;border:2px solid var(--ol);font-size:10px;display:flex;align-items:center;justify-content:center}
+  .zoom{display:flex;align-items:center;gap:4px;padding:4px}
+  .zoom button{width:28px;height:28px;border-radius:8px;border:2px solid var(--ol);background:#2e3850;color:var(--text);font-size:16px;font-weight:800;cursor:pointer}
+  .zoom button:hover{background:#3a4766}
+  .zoom span{font-size:11px;color:var(--dim);width:40px;text-align:center;font-variant-numeric:tabular-nums}
+  #fps{font-size:10px;color:var(--dim);margin-top:4px}
+  /* ===== inventory ala Growtopia: satu panel di bawah, quick bar + handle tarik + grid ===== */
+  .inv{position:absolute;z-index:5;left:50%;bottom:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:min(720px,100vw)}
+  .qrow{display:flex;align-items:flex-end;gap:8px;position:relative}
+  .quick{display:flex;gap:5px;padding:6px 6px 5px;background:rgba(18,32,52,.92);border:2px solid #4fa3d9;border-bottom:none;border-radius:10px 10px 0 0}
+  .qs{position:relative;width:46px;height:46px;border-radius:8px;border:2px solid #2c4a6e;background:linear-gradient(180deg,#2b4566,#1d3150);
+    display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .qs.empty{opacity:.45;cursor:default}
+  .qs img{width:32px;height:32px;image-rendering:pixelated;pointer-events:none}
+  .grip{position:absolute;left:50%;top:-14px;transform:translateX(-50%);width:62px;height:14px;border-radius:8px 8px 0 0;
+    background:#4fa3d9;border:2px solid #17354f;border-bottom:none;cursor:ns-resize;display:flex;align-items:center;justify-content:center}
+  .grip::before{content:'';width:26px;height:3px;border-radius:2px;background:#d8f0ff;box-shadow:0 -4px 0 #d8f0ff00,0 4px 0 #d8f0ff00}
+  .grip:hover{background:#6cc0f0}
+  .invBody{width:100%;height:0;overflow:hidden;background:rgba(18,32,52,.94);border:2px solid #4fa3d9;border-bottom:none;border-radius:10px 10px 0 0;
+    transition:height .18s ease;display:flex;flex-direction:column}
+  .inv:not(.open) .invBody{border-color:transparent}
+  .invBody .grid{flex:1;overflow:auto;padding:8px 8px 0;gap:5px;align-content:start}
+  .invBody .cell{border:2px solid #2c4a6e;background:linear-gradient(180deg,#2b4566,#1d3150);box-shadow:none;border-radius:8px}
+  .invBody .cell.empty{opacity:.35}
+  .invBody .cell.locked{display:none}
+  .invBar{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;border-top:1px solid #2c4a6e}
+  .invBar .nm{font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .invBar .sub{color:#8fb5d6}
+  .invBar input{width:62px;padding:4px 6px}
+  .invBar .btn{padding:5px 10px}
+  .cell.worn{box-shadow:0 0 0 2px #b07ce8 inset}
+  .cell .tag{position:absolute;left:2px;top:2px;font-size:7px;font-weight:800;background:#b07ce8;color:#fff;border-radius:4px;padding:0 3px}
+  /* konsol chat di atas (ala Growtopia) */
+  .chatbox{position:absolute;z-index:4;left:12px;top:12px;width:min(640px,calc(100vw - 230px));display:flex;flex-direction:column;
+    background:rgba(16,26,44,.78);border:2px solid #4f6f9a;border-radius:10px;overflow:hidden}
+  .chatTabs{display:flex;gap:2px;background:rgba(10,16,30,.7);border-bottom:1px solid #2c4a6e}
+  .ctab{padding:5px 10px;background:none;border:none;color:#8fb5d6;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.4px}
+  .ctab.on{color:#fff;background:#2b4566}
+  .ctab.tog{margin-left:auto}
+  #chatlog{height:118px;overflow:auto;font-size:12px;line-height:1.5;padding:5px 9px;text-shadow:0 1px 0 #000}
+  #chatlog .ts{color:#6f8aa8;font-size:10.5px;font-variant-numeric:tabular-nums}
+  .chatbox.min #chatlog{height:36px}
+  .chatbox form{display:flex;border-top:1px solid #2c4a6e}
+  .chatbox input{padding:6px 9px;font-size:12px;background:rgba(6,10,18,.7);border:none;border-radius:0}
+  .who{font-size:12px;font-weight:800}
+  .qs.on{border-color:#ffd400;box-shadow:0 0 0 2px #ffd400 inset,0 0 10px rgba(255,212,0,.6)}
+  .n{position:absolute;right:4px;bottom:1px;font-size:11px;font-weight:800;text-shadow:0 1px 0 #000,0 0 3px #000,0 0 3px #000}
+  .toast{position:absolute;left:50%;top:calc(var(--tlTop,200px) - 2px);z-index:6;transform:translate(-50%,-6px);padding:8px 14px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .modal{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(5,7,12,.45)}
+  .modal.hidden{display:none}
+  .win{width:min(600px,94vw);max-height:86vh;display:flex;flex-direction:column;padding:14px}
+  .win h2{margin:0 0 10px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .win h2 .sub{font-size:12px;color:var(--dim);font-weight:500}
+  .win h2 .x{margin-left:auto}
+  .tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .tab{padding:6px 12px;border-radius:8px;border:2px solid var(--ol);background:#141925;color:var(--dim);font-size:12px;font-weight:700;cursor:pointer}
+  .tab.on{background:#2e3850;color:var(--text);box-shadow:0 0 0 2px var(--accent) inset}
+  .scroll{overflow:auto;padding-right:4px}
+  .btn{padding:7px 12px;border-radius:8px;border:2px solid var(--ol);background:#2e3850;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}
+  .btn:hover{background:#3a4766}
+  .btn.primary{background:#3e8a52}
+  .btn.primary:hover{background:#4aa262}
+  .btn.warn:hover{background:#8a3a40}
+  .btn:disabled{opacity:.4;cursor:default;background:#2e3850}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+  .cell{position:relative;aspect-ratio:1;border-radius:9px;border:3px solid var(--ol);background:#141925;box-shadow:0 0 0 2px #2c3447 inset;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .cell.empty{opacity:.4;cursor:default}
+  .cell.on{border-color:#ffd400;box-shadow:0 0 0 2px #ffd400 inset,0 0 10px rgba(255,212,0,.5)}
+  .cell img{width:64%;height:64%;image-rendering:pixelated;pointer-events:none}
+  .cell .none{font-size:10px;color:var(--dim)}
+  .info{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;border-top:2px solid var(--line);padding-top:10px;margin-top:10px}
+  .info .nm{font-weight:700;min-width:130px}
+  input,textarea{width:100%;padding:8px;border-radius:8px;border:2px solid var(--ol);background:#0d1118;color:var(--text);font:inherit;font-size:13px}
+  .info input{width:70px}
+  label{display:block;font-size:12px;color:var(--dim);margin:10px 0 5px}
+  label.chk{display:flex;gap:8px;align-items:center;color:var(--text)}
+  label.chk input{width:auto}
+  .note{font-size:12px;color:var(--dim);line-height:1.5;margin:6px 0}
+  .shopGem{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:14px;font-weight:800}
+  .shopGem img{width:18px;height:18px}
+  .shopItem{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:#141925;border:2px solid var(--ol);margin-bottom:7px}
+  .si{width:46px;height:46px;border-radius:9px;background:#0d1118;border:2px solid var(--ol);display:flex;align-items:center;justify-content:center}
+  .si img{width:32px;height:32px;image-rendering:pixelated}
+  .sd{flex:1;display:flex;flex-direction:column;gap:2px;font-size:13px}
+  .sd span{font-size:11px;color:var(--dim)}
+  .buy{display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:2px solid var(--ol);background:#3e8a52;color:#fff;font-weight:800;cursor:pointer;min-width:86px;justify-content:center}
+  .buy:hover{background:#4aa262}
+  .buy:disabled{background:#3a3f4c;color:#9aa;cursor:default}
+  .buy img{width:16px;height:16px}
+  .lvbig{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+  .ring{width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a8,#e0a52a);border:4px solid var(--ol);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#3b2606}
+  .ring b{font-size:28px;line-height:1}
+  .ring span{font-size:10px;font-weight:700}
+  .lvinfo{flex:1}
+  .lvinfo p{font-size:12px;color:var(--dim);margin:8px 0 0}
+  .xpline{height:12px;border-radius:99px;background:#0c0f16;border:2px solid var(--ol);overflow:hidden}
+  .xpline.small{height:8px;margin:6px 0 3px}
+  .xpline > div{height:100%;background:linear-gradient(90deg,#7be37a,#c9f56a)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  .stats div{background:#141925;border:2px solid var(--ol);border-radius:9px;padding:8px}
+  .stats span{display:block;font-size:10px;color:var(--dim)}
+  .stats b{font-size:16px}
+  .quest{display:flex;gap:10px;align-items:center;padding:9px;border-radius:10px;background:#141925;border:2px solid var(--ol);margin-bottom:7px}
+  .quest.claimed{opacity:.55}
+  .qt{flex:1;display:flex;flex-direction:column;font-size:13px}
+  .qt span{font-size:11px;color:var(--dim)}
+  .recipe{gap:8px}
+  .recipe .rc{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:70px;font-size:11px}
+  .recipe .rc img{width:30px;height:30px;image-rendering:pixelated}
+  .recipe .rc.out span{color:#c9f56a;font-weight:700}
+  .recipe .op{font-size:18px;color:var(--dim)}
+  .recipe .rt{margin-left:auto;font-size:11px;color:var(--dim)}
+  /* nama + bendera + ikon wrench */
+  .who{display:flex;align-items:center;gap:5px}
+  .wrenchBtn{width:24px;height:24px;border-radius:6px;border:2px solid var(--ol);background:#ffd25e;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;animation:wpulse 2s ease-in-out infinite}
+  .wrenchBtn img{width:18px;height:18px;image-rendering:pixelated}
+  .wrenchBtn:hover{filter:brightness(1.15);animation:none}
+  .wrenchBtn.active{background:#7be37a}
+  @keyframes wpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,210,94,.6)}50%{box-shadow:0 0 0 5px rgba(255,210,94,0)}}
+  .hintNew{font-size:9px;font-weight:800;color:#ffd25e;letter-spacing:.4px}
+  .warnBox{background:#3a1d22;border:2px solid #8a3a40;border-radius:8px;padding:8px 10px;font-size:12px;color:#ffd0d0;margin:10px 0 0}
+  /* toko */
+  .shopWin{width:min(720px,96vw)}
+  .sbanner{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;border:3px solid var(--ol);cursor:pointer;margin-bottom:10px;
+    background:linear-gradient(120deg,#7a2a8a,#d6457a 55%,#ffb03a);box-shadow:0 0 0 2px #ff9ad0 inset}
+  .sbanner:hover{filter:brightness(1.08)}
+  .sbt{flex:1;display:flex;flex-direction:column;gap:3px}
+  .sbt b{font-size:20px;-webkit-text-stroke:2px #17121c;paint-order:stroke fill;color:#fff}
+  .sbt span{font-size:12px;color:#fff3f8}
+  .sbt .hot{display:inline-block;width:max-content;padding:2px 8px;border-radius:99px;background:#ffe85a;color:#5a2a00;font-weight:900;font-size:10px}
+  .sbt .sp{font-weight:900;font-size:14px;display:flex;align-items:center;gap:4px}
+  .sbt .sp img,.scard .pr img{width:15px;height:15px}
+  .sbi{width:78px;height:78px;image-rendering:pixelated;filter:drop-shadow(0 4px 0 rgba(0,0,0,.35));animation:bob 2.2s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-5px) rotate(-3deg)}}
+  .scats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .scat{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:12px;min-height:92px;border-radius:12px;border:3px solid var(--ol);cursor:pointer;
+    color:#fff;text-align:left;position:relative;overflow:hidden;box-shadow:0 0 0 2px rgba(255,255,255,.25) inset}
+  .scat img{position:absolute;right:8px;bottom:6px;width:52px;height:52px;image-rendering:pixelated;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35))}
+  .scat b{font-size:16px;-webkit-text-stroke:2px #17121c;paint-order:stroke fill}
+  .scat span{font-size:11px;max-width:65%;font-weight:700;text-shadow:0 1px 0 #000,0 0 3px #000,1px 0 0 #000,-1px 0 0 #000}
+  .scat:hover{transform:translateY(-2px)}
+  .scathead{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;border:3px solid var(--ol);margin-bottom:8px;color:#fff}
+  .scathead img{width:30px;height:30px;image-rendering:pixelated}
+  .scathead b{font-size:15px;-webkit-text-stroke:2px #17121c;paint-order:stroke fill}
+  .scathead span{font-size:11px;margin-left:auto}
+  .scards{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:7px}
+  .scard{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;border-radius:10px;border:3px solid var(--ol);cursor:pointer;color:#fff;
+    background:linear-gradient(180deg,#26324a,#182033);box-shadow:0 0 0 2px #3a4766 inset}
+  .scard .art{width:100%;height:58px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--c1),var(--c2))}
+  .scard .art img{width:42px;height:42px;image-rendering:pixelated;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35))}
+  .scard b{font-size:11.5px;text-align:center;line-height:1.2;min-height:28px}
+  .scard .pr{display:flex;align-items:center;gap:3px;font-weight:900;font-size:12px;color:#c8ecff}
+  .scard.on{box-shadow:0 0 0 2px #ffd400 inset,0 0 10px rgba(255,212,0,.5)}
+  .scard.poor .pr{color:#ff9a9a}
+  .scard .own{position:absolute;top:4px;left:4px;font-size:8px;font-weight:900;background:#3e8a52;border-radius:4px;padding:1px 4px}
+  .scard:hover{transform:translateY(-2px)}
+  .shopFoot{display:flex;gap:10px;align-items:stretch;margin-top:10px}
+  .shopInfo{flex:1;background:#101a2c;border:2px solid #2c4a6e;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;min-height:48px}
+  .shopInfo span{color:#a9c0dc}
+  .shopBtns{display:flex;flex-direction:column;gap:6px;justify-content:center}
+  .shopBtns .btn{min-width:110px;padding:9px}
+  /* bendera */
+  .flags{display:flex;flex-wrap:wrap;gap:4px}
+  .flagimg{image-rendering:pixelated;vertical-align:middle;border-radius:2px}
+  .flag{font-size:18px;width:38px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:2px solid var(--ol);background:#141925;cursor:pointer;padding:0}
+  .flag.on{box-shadow:0 0 0 2px #ffd400 inset}
+  /* world lobby ala Growtopia */
+  .wlobby{width:min(760px,96vw);display:flex;flex-direction:column;gap:8px;padding:16px;border-radius:14px;background:rgba(10,18,34,.86);border:2px solid #4f6f9a;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .wlMsg{background:rgba(16,26,44,.85);border:2px solid #4f6f9a;border-radius:10px;padding:8px 12px;font-size:13px;color:#9fd0ff}
+  .wlMsg .s{color:#ffd25e;font-weight:800}
+  .wlHead{font-size:13px;color:#cfe6ff}
+  .wlName{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800;color:#fff;text-shadow:0 2px 0 #000}
+  .wlName input{flex:1;font-size:16px;padding:10px 12px;text-transform:uppercase;background:#d7dde6;color:#17121c;border-color:#17121c}
+  .wlHint{font-size:12px;color:#fff;text-shadow:0 1px 0 #000}
+  .wlFilter{display:flex;align-items:center;gap:6px;font-size:12px;color:#cfe6ff}
+  .lbtab{padding:4px 10px;border-radius:99px;border:2px solid var(--ol);background:#2e3850;color:#cfe6ff;font-size:11px;font-weight:700;cursor:pointer}
+  .lbtab.on{background:#4fa3d9;color:#fff}
+  .wlWorlds{display:flex;flex-wrap:wrap;gap:7px;max-height:42vh;overflow:auto;padding:4px 0}
+  .wlWorlds .empty{font-size:12px;color:#cfe6ff}
+  .wbtn{padding:10px 16px;border-radius:999px;border:3px solid var(--ol);color:#fff;font-weight:800;font-size:13px;cursor:pointer;text-shadow:0 1px 0 #000;box-shadow:0 3px 0 rgba(0,0,0,.4)}
+  .wbtn.hist{background:linear-gradient(180deg,#9a5ce0,#6a2fb0)}
+  .wbtn.own{background:linear-gradient(180deg,#4ac46a,#22803e)}
+  .wbtn.other{background:linear-gradient(180deg,#7b8494,#4f5766)}
+  .wbtn:hover{filter:brightness(1.15);transform:translateY(-1px)}
+  .wlLegend{font-size:11px;color:#cfe6ff;display:flex;align-items:center;gap:6px}
+  .wlLegend i{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid var(--ol)}
+  .wlLegend i.hist{background:#8a4fd0} .wlLegend i.own{background:#3aaa5a} .wlLegend i.other{background:#6a7383}
+  .wlBtns{display:flex;justify-content:space-between;gap:10px;margin-top:4px}
+  .wlBtns .btn{min-width:160px}
+  /* layar judul / akun / lobby */
+  #stage.menuMode .tl, #stage.menuMode #fps, #stage.menuMode .rstack, #stage.menuMode .inv, #stage.menuMode .chatbox, #stage.menuMode #touchUI{display:none}
+  .screen{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,10,20,.6);backdrop-filter:blur(3px)}
+  .screen.hidden{display:none}
+  .sbox{width:min(420px,92vw);padding:22px;display:flex;flex-direction:column;gap:10px}
+  .logo{font-size:44px;font-weight:900;letter-spacing:1px;text-align:center;color:#ffd84a;-webkit-text-stroke:3px #17121c;paint-order:stroke fill;text-shadow:0 5px 0 #17121c;margin:0 0 4px}
+  .logo small{display:block;font-size:13px;color:#cfe6ff;-webkit-text-stroke:0;text-shadow:none;letter-spacing:.3px;font-weight:600;margin-top:4px}
+  .big{padding:13px;font-size:15px}
+  .sbox h3{margin:0;font-size:18px}
+  .sbox .err{color:#ff8a8a;font-size:12px;min-height:16px}
+  .sbox .row{display:flex;gap:8px;justify-content:space-between;align-items:center}
+  .link{background:none;border:none;color:#7fc8ff;cursor:pointer;font-size:12px;padding:0;text-decoration:underline}
+  .wchips{display:flex;flex-wrap:wrap;gap:6px}
+  .wchip{padding:7px 11px;border-radius:8px;border:2px solid var(--ol);background:#2b4566;color:#fff;cursor:pointer;font-size:12px}
+  .wchip:hover{background:#3a5f8a}
+  .wchips .empty{font-size:12px;color:var(--dim)}
+  .sec{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+  .ctl{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;border:2px solid var(--ol);background:#141925;cursor:pointer;text-align:left;color:var(--text)}
+  .ctl:hover,.ctl.on{box-shadow:0 0 0 2px #ffd400 inset}
+  .ctl .ic{font-size:26px;width:36px;text-align:center}
+  .ctl b{display:block;font-size:14px}
+  .ctl span{font-size:11px;color:var(--dim)}
+  /* profil */
+  .avatar{width:34px;height:34px;border-radius:50%;background:#2e3850;border:2px solid var(--ol);display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+  #profName{font-size:16px}
+  .tab .badge{display:inline-block;min-width:16px;padding:0 4px;border-radius:99px;background:#ff5a6e;color:#fff;font-size:10px;margin-left:4px}
+  .recipe.locked{opacity:.7}
+  .rc.mystery .q{width:30px;height:30px;border-radius:7px;border:2px dashed #5a6680;display:flex;align-items:center;justify-content:center;font-weight:900;color:#8d97ab}
+  .rc.mystery span{color:#8d97ab !important}
+  /* kontrol sentuh */
+  #touchUI{position:absolute;inset:0;z-index:6;pointer-events:none}
+  #touchUI.hidden{display:none}
+  #tStick{position:absolute;left:26px;bottom:110px;width:130px;height:130px;border-radius:50%;background:rgba(20,30,50,.45);border:3px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
+  #tKnob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.75);border:3px solid #17121c}
+  .tbtn{position:absolute;width:76px;height:76px;border-radius:50%;border:3px solid #17121c;color:#fff;font-weight:800;font-size:13px;pointer-events:auto;touch-action:none;display:flex;align-items:center;justify-content:center}
+  .tbtn.down{filter:brightness(1.3);transform:scale(.95)}
+  #tJump{right:30px;bottom:120px;background:#3e8a52}
+  #tAct{right:120px;bottom:90px;background:#c2563a}
+  .pickgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;max-height:200px;overflow:auto}
+  .menuBtns{display:flex;flex-direction:column;gap:7px}
+  .menuBtns .btn{padding:10px;font-size:13px;text-align:left}
+  .opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .opt input[type=range]{width:160px}
+  .opt input[type=checkbox]{width:18px;height:18px}
+  .keys{font-size:11px;color:var(--dim);line-height:1.9;margin-top:8px}
+  kbd{background:#0d1118;border:2px solid var(--ol);border-radius:5px;padding:0 5px;color:var(--text);font-size:10px}
+
+  /* ===================== HUD v1.1 — gaya Growtopia (override) ===================== */
+  :root{ --gtBlue:#3aa3e3; --gtBlueD:#1e6fae; --gtInk:#0b2238; --gtPanel:rgba(8,20,38,.80); --gtEdge:#6fc4f5; --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px) }
+  .hudHidden{display:none}
+  .ol{text-shadow:-2px 0 0 var(--gtInk),2px 0 0 var(--gtInk),0 -2px 0 var(--gtInk),0 2px 0 var(--gtInk),-1.5px -1.5px 0 var(--gtInk),1.5px 1.5px 0 var(--gtInk),-1.5px 1.5px 0 var(--gtInk),1.5px -1.5px 0 var(--gtInk)}
+  .rstack{right:calc(10px + var(--sar));top:calc(8px + var(--sat));gap:4px;align-items:flex-end;pointer-events:none;z-index:5}
+  .rstack > *{pointer-events:auto}
+  .rstack .who{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#fff;pointer-events:none;
+    text-shadow:-1px 0 0 var(--gtInk),1px 0 0 var(--gtInk),0 -1px 0 var(--gtInk),0 1px 0 var(--gtInk),0 2px 0 var(--gtInk)}
+  .gemline{display:flex;align-items:center;gap:6px;pointer-events:none}
+  .gemline img{width:26px;height:26px;image-rendering:pixelated;filter:drop-shadow(0 2px 0 var(--gtInk))}
+  #gemv{font-size:24px;font-weight:900;color:#fff;letter-spacing:.5px;font-variant-numeric:tabular-nums;line-height:1;
+    text-shadow:-2px 0 0 var(--gtInk),2px 0 0 var(--gtInk),0 -2px 0 var(--gtInk),0 2px 0 var(--gtInk),-1.5px -1.5px 0 var(--gtInk),1.5px 1.5px 0 var(--gtInk),-1.5px 1.5px 0 var(--gtInk),1.5px -1.5px 0 var(--gtInk),0 4px 0 var(--gtInk)}
+  .hudBtns{display:flex;gap:6px;margin-top:2px}
+  .gb{position:relative;width:44px;height:44px;padding:0;border-radius:11px;border:2px solid var(--gtInk);cursor:pointer;
+    background:linear-gradient(180deg,#7fd0ff 0,#3aa3e3 46%,#1e6fae 100%);box-shadow:inset 0 2px 0 rgba(255,255,255,.55),inset 0 -3px 0 rgba(0,0,0,.25),0 3px 0 var(--gtInk);
+    display:flex;align-items:center;justify-content:center;transition:transform .06s}
+  .gb:active{transform:translateY(2px);box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -2px 0 rgba(0,0,0,.25),0 1px 0 var(--gtInk)}
+  .gb svg{width:26px;height:26px;filter:drop-shadow(0 1px 0 var(--gtInk))}
+  .gb img{width:26px;height:26px;image-rendering:pixelated;filter:drop-shadow(0 1px 0 var(--gtInk))}
+  #wrenchBtn{animation:none;background:linear-gradient(180deg,#ffe58a 0,#f4b631 50%,#c47f12 100%)}
+  #wrenchBtn.active{background:linear-gradient(180deg,#b9ff9c 0,#5fd24a 50%,#2f8f25 100%)}
+  #wrenchBtn .badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;border-radius:99px;background:#ff4d5e;border:2px solid var(--gtInk);color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center}
+  .lvbtn{background:linear-gradient(180deg,#ffe58a 0,#f4b631 50%,#c47f12 100%)}
+  .lvbtn .ring{width:34px;height:34px;border-radius:50%;background:conic-gradient(#5dff6a calc(var(--xp,0)*1%),rgba(11,34,56,.55) 0);display:flex;align-items:center;justify-content:center}
+  .lvbtn::after{content:'LV';position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);padding:0 4px;border-radius:4px;background:var(--gtInk);color:#ffe58a;font-size:8px;font-weight:900;letter-spacing:.5px}
+  .lvbtn .ring b{width:26px;height:26px;border-radius:50%;background:#fff3c4;border:2px solid var(--gtInk);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#5a3600}
+  .xpline2{display:flex;align-items:center;gap:6px;pointer-events:none;margin-top:6px;padding:3px 7px;border-radius:99px;background:rgba(10,24,44,.55)}
+  .xpline2 .bar{width:96px;height:6px;border:1.5px solid var(--gtInk);background:rgba(11,34,56,.7)}
+  #xpbar{background:linear-gradient(90deg,#5dff6a,#b8ff6a)}
+  .xpline2 small{font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 0 var(--gtInk),0 0 2px var(--gtInk)}
+  .rstack .zoom{display:flex;gap:4px;padding:0;background:none;border:none;box-shadow:none}
+  .rstack .zoom button{width:28px;height:26px;border-radius:8px;border:2px solid var(--gtInk);background:linear-gradient(180deg,#7fd0ff,#2a86c9);color:#fff;font-weight:900;box-shadow:0 2px 0 var(--gtInk)}
+  .rstack .zoom span{color:#fff;font-weight:800;text-shadow:0 1px 0 var(--gtInk),0 0 2px var(--gtInk)}
+  #fps{position:absolute;z-index:4;left:calc(8px + var(--sal));bottom:calc(4px + var(--sab));margin:0;font-size:10px;font-weight:700;color:rgba(255,255,255,.55);pointer-events:none;text-shadow:0 1px 0 #000}
+  /* chat console ala GT: gelap transparan, memudar saat diam */
+  .chatbox{left:calc(8px + var(--sal));top:calc(8px + var(--sat));width:min(520px,calc(100vw - 230px));background:var(--gtPanel);border:2px solid rgba(111,196,245,.55);border-radius:8px;transition:background .4s,border-color .4s}
+  .chatbox:not(.fresh):not(.focus){background:rgba(8,20,38,.45);border-color:rgba(111,196,245,.22)}
+  .chatTabs{align-items:center;background:rgba(5,14,28,.55)}
+  .ctab{padding:5px 8px;font-size:10px;letter-spacing:.6px;color:#9cc7e8}
+  .ctab.on{color:#fff;background:rgba(58,163,227,.45);box-shadow:inset 0 -2px 0 var(--gtEdge)}
+  .cworld{margin-left:auto;display:flex;align-items:center;gap:5px;padding:0 4px;font-size:11px;white-space:nowrap;overflow:hidden}
+  .cworld b{color:#ffe58a;letter-spacing:.5px}
+  #guestTag{margin:0;padding:1px 6px;font-size:9px;background:#2d6c8a}
+  .ctab.tog{margin-left:0;width:28px}
+  .ctab.tog::before{content:'';display:block;margin:0 auto;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #cfe6ff}
+  .chatbox.min .ctab.tog::before{border-top:none;border-bottom:6px solid #cfe6ff}
+  #chatlog{height:96px;font-size:12px;text-shadow:0 1px 0 #000,0 0 2px #000}
+  .chatbox.min #chatlog{height:20px}
+  .chatbox input{background:rgba(3,10,22,.6)}
+  .chatbox.min form{display:none}
+  .chatbox.focus form{display:flex}
+  /* toast di bawah konsol, gaya GT */
+  .toast{background:rgba(10,24,44,.86);border:2px solid var(--gtEdge);border-radius:8px;box-shadow:0 3px 0 var(--gtInk);font-weight:800;text-shadow:0 1px 0 #000}
+  /* quick bar: slot lebih besar, aman dari notch, label item dipegang */
+  .inv{padding-bottom:var(--sab)}
+  .quick{background:rgba(10,24,44,.82);border-color:var(--gtEdge)}
+  .qs{width:50px;height:50px;border-color:#2c5a86;background:linear-gradient(180deg,#2f5e8c,#1b3a5e)}
+  .qs img{width:34px;height:34px}
+  .heldTag{position:absolute;left:50%;bottom:calc(100% + 18px);transform:translateX(-50%);white-space:nowrap;pointer-events:none;
+    font-size:13px;font-weight:900;color:#fff;opacity:0;transition:opacity .25s;
+    text-shadow:-1.5px 0 0 var(--gtInk),1.5px 0 0 var(--gtInk),0 -1.5px 0 var(--gtInk),0 1.5px 0 var(--gtInk),0 3px 0 var(--gtInk)}
+  .heldTag.show{opacity:1}
+  /* HP landscape (tinggi kecil) */
+  @media (max-height:500px){
+    #chatlog{height:58px}
+    .chatbox{width:min(440px,calc(100vw - 250px))}
+    .gb{width:40px;height:40px}
+    .rstack .who{display:none}
+  }
+  /* HP portrait: chat selebar layar, cluster kanan turun di bawah chat (tidak bertumpuk) */
+  @media (orientation:portrait) and (max-width:700px){
+    .chatbox{width:calc(100vw - 16px - var(--sal) - var(--sar))}
+    #chatlog{height:62px}
+    .rstack{top:var(--tlTop,120px);display:grid;grid-template-columns:auto auto;align-items:center;column-gap:10px;row-gap:6px;justify-items:end}
+    .rstack .xpline2{grid-column:1 / -1}
+    .rstack .who{display:none}
+    .toast{top:calc(var(--tlTop,120px) + 84px)}
+  }
+  /* layar sentuh: zoom lewat Menu, FPS disembunyikan */
+  @media (pointer:coarse){ .rstack .zoom, #fps{display:none} }
+  /* tas terbuka = kontrol sentuh disembunyikan supaya tidak menumpuk slot tas */
+  .inv.open ~ #touchUI{display:none}
+  /* ===================== HUD v1.2 — Growtopia persis ===================== */
+  .gtR{position:absolute;z-index:5;right:calc(8px + var(--sar));top:calc(6px + var(--sat));display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+  .gtR > *{pointer-events:auto}
+  .gtRow{display:flex;align-items:center;gap:8px}
+  .gtb{position:relative;width:48px;height:48px;padding:0;border-radius:10px;border:3px solid #2f86cf;background:linear-gradient(180deg,#ffffff 0,#ffffff 55%,#dcefff 100%);
+    box-shadow:0 0 0 2px #fff,0 3px 0 2px rgba(10,40,70,.45);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .gtb:active,.gtEye:active,.gtGems:active{transform:translateY(2px)}
+  .gtb svg{width:30px;height:30px}
+  .gtb img{width:30px;height:30px;image-rendering:pixelated}
+  .gtb.bub{background:none;border:none;box-shadow:none}
+  .gtb.bub svg{width:46px;height:46px;filter:drop-shadow(0 3px 0 rgba(10,40,70,.45))}
+  #wrenchBtn.active{border-color:#3fae3a;background:linear-gradient(180deg,#fff 0,#fff 55%,#d9ffd2 100%)}
+  #wrenchBtn .badge{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;border-radius:99px;background:#ff3b30;border:2px solid #fff;color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center}
+  .gtEye{width:46px;height:32px;padding:0;border-radius:50%;border:2px solid #fff;background:#bde6f8;box-shadow:0 2px 0 rgba(10,40,70,.45);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .gtEye svg{width:24px;height:24px}
+  .gtGems{display:flex;align-items:center;gap:6px;margin-top:2px;padding:4px 8px 4px 12px;border:none;border-radius:8px;background:rgba(30,30,30,.55);cursor:pointer}
+  .gtGems #gemv{font:900 21px/1 "Trebuchet MS",ui-sans-serif,system-ui,sans-serif;color:#fff;letter-spacing:.3px;font-variant-numeric:tabular-nums;
+    text-shadow:-2px 0 0 #000,2px 0 0 #000,0 -2px 0 #000,0 2px 0 #000,-1.4px -1.4px 0 #000,1.4px 1.4px 0 #000,-1.4px 1.4px 0 #000,1.4px -1.4px 0 #000}
+  .gtGems img{width:24px;height:24px;image-rendering:pixelated;filter:drop-shadow(0 1px 0 #000)}
+  .gtR .zoom{display:flex;align-items:center;gap:4px;padding:0;background:none;border:none;box-shadow:none}
+  .gtR .zoom button{width:30px;height:28px;border-radius:8px;border:2px solid #2f86cf;background:#fff;color:#2f86cf;font-weight:900;box-shadow:0 2px 0 rgba(10,40,70,.45)}
+  .gtR .zoom span{color:#fff;font-weight:800;font-size:11px;text-shadow:0 1px 0 #000,0 0 2px #000}
+  #stage.menuMode .gtR{display:none}
+  /* sembunyikan UI (tombol mata): hanya mata yang tersisa */
+  #stage.hudOff .chatbox,#stage.hudOff .inv,#stage.hudOff #touchUI,#stage.hudOff .toast,#stage.hudOff .gtR > :not(.gtRow),#stage.hudOff #imenu,#stage.hudOff #fps{display:none!important}
+  #stage.hudOff .gtEye{background:#ffe27a}
+  /* chat: tertutup = tab biru di atas + beberapa baris terbaru tanpa panel; terbuka = konsol biru baja */
+  .chatbox{overflow:visible;left:calc(6px + var(--sal));top:calc(4px + var(--sat));width:calc(100vw - 132px - var(--sal) - var(--sar));max-width:none;
+    background:rgba(70,132,166,.84);border:2px solid #1e4a5e;border-radius:6px}
+  .chatbox:not(.fresh):not(.focus){background:rgba(70,132,166,.84);border-color:#1e4a5e}
+  .chatTabs{gap:4px;padding:4px;background:none;border-bottom:none;overflow:hidden;flex-wrap:nowrap}
+  .ctab{flex:none}
+  .ctab{padding:5px 10px;border-radius:7px;border:2px solid rgba(255,255,255,.5);color:#fff;font-size:11px;font-weight:900;letter-spacing:.5px;opacity:.72;
+    text-shadow:0 1px 0 rgba(0,0,0,.6);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 2px 0 rgba(0,0,0,.25)}
+  .ctab[data-f=all]{background:#79c6ea}.ctab[data-f=chat]{background:#c48a3a}.ctab[data-f=sys]{background:#7c94a8}.ctab[data-f=act]{background:#b48ab0}
+  .ctab.on{opacity:1;border-color:#fff;box-shadow:inset 0 2px 0 rgba(255,255,255,.45),0 0 0 1px #1e4a5e}
+  .ctab.tog{display:none}
+  .cworld{color:#fff;text-shadow:0 1px 0 #000}
+  #chatlog{height:calc(var(--chatH,120px));font:700 12.5px/1.45 "Trebuchet MS",ui-sans-serif,system-ui,sans-serif;
+    text-shadow:-1px 0 0 #000,1px 0 0 #000,0 -1px 0 #000,0 1px 0 #000}
+  #chatlog .ts{color:#d6ecf7}
+  .chatbox form{border-top:2px solid #1e4a5e}
+  .chatbox input{background:rgba(255,255,255,.92);color:#10202c;font-weight:700}
+  .chatbox input::placeholder{color:#5a7488}
+  .chatbox.min{background:none!important;border-color:transparent!important;pointer-events:none}
+  .chatbox.min .chatTabs{display:none}
+  .chatbox.min #chatlog{height:56px;overflow:hidden;margin-top:24px;padding:0 4px;transition:opacity .6s;-webkit-mask-image:linear-gradient(transparent 0,#000 40%);mask-image:linear-gradient(transparent 0,#000 40%)}
+  .chatbox.min:not(.fresh) #chatlog{opacity:0}
+  .chatbox.min form{display:none!important}
+  .chatPull{position:absolute;left:50%;bottom:-24px;transform:translateX(-50%);width:58px;height:22px;padding:0;border:2px solid #fff;border-top:none;border-radius:0 0 10px 10px;
+    background:#a8d8f0 linear-gradient(#fff,#fff) center 5px/24px 2.5px no-repeat;cursor:pointer;pointer-events:auto;box-shadow:0 2px 0 rgba(10,40,70,.35);z-index:2}
+  .chatPull::after{content:'';position:absolute;left:50%;top:10px;transform:translateX(-50%);width:24px;height:2.5px;background:#fff;box-shadow:0 5px 0 #fff}
+  .chatbox.min .chatPull{position:fixed;top:0;bottom:auto;left:50%}
+  /* tas & quick bar: slot biru, bingkai oranye, pilihan = sudut kuning */
+  .quick{background:none;border:none;padding:8px 0 calc(8px + var(--sab));gap:9px}
+  .qs{width:52px;height:52px;border-radius:8px;border:3px solid #e8902a;background:linear-gradient(180deg,#5aa6d6,#3f86b8);box-shadow:inset 0 0 0 2px rgba(255,255,255,.25),0 2px 0 rgba(0,0,0,.35)}
+  .qs.empty{opacity:.55}
+  .qs.on{border-color:#e8902a;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25),0 2px 0 rgba(0,0,0,.35)}
+  .qs.on::before{content:'';position:absolute;inset:-7px;pointer-events:none;
+    background:linear-gradient(#ffe500,#ffe500) 0 0/12px 4px,linear-gradient(#ffe500,#ffe500) 0 0/4px 12px,linear-gradient(#ffe500,#ffe500) 100% 0/12px 4px,linear-gradient(#ffe500,#ffe500) 100% 0/4px 12px,
+      linear-gradient(#ffe500,#ffe500) 0 100%/12px 4px,linear-gradient(#ffe500,#ffe500) 0 100%/4px 12px,linear-gradient(#ffe500,#ffe500) 100% 100%/12px 4px,linear-gradient(#ffe500,#ffe500) 100% 100%/4px 12px;
+    background-repeat:no-repeat;filter:drop-shadow(0 0 1px #000)}
+  .qs img{width:36px;height:36px}
+  .n{font:900 11px "Trebuchet MS",ui-sans-serif,sans-serif;text-shadow:-1px 0 0 #000,1px 0 0 #000,0 -1px 0 #000,0 1px 0 #000}
+  .grip{top:-16px;width:58px;height:22px;border:2px solid #fff;border-bottom:none;border-radius:10px 10px 0 0;background:#a8d8f0;box-shadow:0 -1px 0 rgba(10,40,70,.3)}
+  .grip::before{width:24px;height:2.5px;background:#fff;box-shadow:0 -5px 0 #fff,0 5px 0 #fff}
+  .grip:hover{background:#c4e7f8}
+  .invBody{background:rgba(86,150,182,.88);border:2px solid #1e4a5e;border-bottom:none;border-radius:8px 8px 0 0}
+  .inv:not(.open) .invBody{border-color:transparent;background:none}
+  .invBody .cell{aspect-ratio:auto;height:46px;border:3px solid #e8902a;background:linear-gradient(180deg,#5aa6d6,#3f86b8);border-radius:8px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.2)}
+  .invBody .cell.on{box-shadow:inset 0 0 0 2px #ffe500,0 0 0 2px #ffe500}
+  .invBar{border-top:2px solid #1e4a5e;background:rgba(30,74,94,.55)}
+  .invBar .sub{color:#e3f3fb}
+  .heldTag{bottom:calc(100% + 26px)}
+  /* kontrol sentuh ala Growtopia: panah kiri/kanan, lompat, pakai item */
+  #touchUI .tk{position:absolute;pointer-events:auto;touch-action:none;width:68px;height:68px;padding:0;border-radius:14px;border:3px solid rgba(255,255,255,.9);
+    background:rgba(255,255,255,.55);box-shadow:0 0 0 2px rgba(47,134,207,.55),0 3px 0 rgba(10,40,70,.4);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+  #touchUI .tk.down{background:rgba(255,255,255,.7);transform:scale(.94)}
+  #touchUI .tk i{width:0;height:0;border:15px solid transparent;filter:drop-shadow(0 0 1px #fff)}
+  #touchUI .tL i{border-right:22px solid #2f86cf;margin-left:-14px}
+  #touchUI .tR i{border-left:22px solid #2f86cf;margin-right:-14px}
+  #touchUI .tJ i{border-bottom:22px solid #2f86cf;margin-top:-14px}
+  #touchUI .tD i{border-width:10px;border-top:14px solid #2f86cf;margin-bottom:-9px}
+  #touchUI .tA img{width:40px;height:40px;image-rendering:pixelated}
+  #touchUI .tL{left:calc(14px + var(--sal));bottom:calc(14px + var(--sab))}
+  #touchUI .tR{left:calc(94px + var(--sal));bottom:calc(14px + var(--sab))}
+  #touchUI .tD{left:calc(64px + var(--sal));bottom:calc(92px + var(--sab));width:44px;height:40px;border-radius:10px}
+  #touchUI .tJ{right:calc(14px + var(--sar));bottom:calc(14px + var(--sab))}
+  #touchUI .tA{right:calc(94px + var(--sar));bottom:calc(14px + var(--sab))}
+  @media (orientation:portrait) and (max-width:700px){
+    #touchUI .tL,#touchUI .tR,#touchUI .tJ,#touchUI .tA{bottom:calc(96px + var(--sab))}
+    #touchUI .tD{bottom:calc(174px + var(--sab))}
+    .ctab{padding:4px 6px;font-size:9.5px} .cworld{display:none}
+    .invBar .sub{display:none} .invBar{flex-wrap:nowrap}
+  }
+  @media (max-height:500px){ .gtb{width:42px;height:42px} .gtb svg,.gtb img{width:26px;height:26px} .gtR{gap:6px} .gtb.bub svg{width:40px;height:40px} }
+  @media (pointer:coarse){ .gtR .zoom{display:none} }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="1280" height="720"></canvas>
+
+  <!-- HUD v1.1 ala Growtopia: tanpa kartu bertumpuk -->
+  <!-- HUD v1.2 — tata letak Growtopia: kolom tombol putih di kanan, gems di bawahnya -->
+  <div class="gtR" id="hudR">
+    <div class="gtRow">
+      <button class="gtEye" id="eyeBtn" title="Sembunyikan UI (H)"><svg viewBox="0 0 24 24"><path fill="#fff" stroke="#2f86cf" stroke-width="2" d="M2 12c3-5 6.5-7 10-7s7 2 10 7c-3 5-6.5 7-10 7s-7-2-10-7z"/><circle cx="12" cy="12" r="3.6" fill="#2f86cf"/><path stroke="#2f86cf" stroke-width="2.4" stroke-linecap="round" d="M4 20L20 4"/></svg></button>
+      <button class="gtb" id="imenu" title="Menu (Esc)"><svg viewBox="0 0 24 24"><path stroke="#2f86cf" stroke-width="3.2" stroke-linecap="round" d="M5 6.5h14M5 12h14M5 17.5h14"/></svg></button>
+    </div>
+    <button class="gtb bub" id="chatBtn" title="Chat (Enter / T)"><svg viewBox="0 0 24 24"><path fill="#fff" stroke="#163a5c" stroke-width="1.8" stroke-linejoin="round" d="M4 4.5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 4v-4H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><path stroke="#2f86cf" stroke-width="1.8" stroke-linecap="round" d="M7 9.5h10M7 13h6"/></svg></button>
+    <button class="gtb" id="wrenchBtn" title="Profil: level, quest, achievement, bestiary"><img id="wrenchIcon" alt=""><span class="badge" id="wrenchHint">!</span></button>
+    <button class="gtGems" id="ishop" title="Toko (B)"><span id="gemv">0</span><img id="gemIcon" alt=""></button>
+    <div class="zoom"><button id="zout" title="Zoom out">−</button><span id="zlv">125%</span><button id="zin" title="Zoom in">+</button></div>
+  </div>
+  <div class="hudHidden">
+    <b id="held">Tinju</b><span id="pflag"></span><span id="pname">Kamu</span>
+    <button id="lvBtn"><b id="lvv">1</b></button><div id="xpbar"></div><small id="xpv"></small>
+  </div>
+  <div id="fps"></div>
+
+  <div class="inv" id="inv">
+    <div class="qrow">
+      <div class="heldTag" id="heldTag"></div>
+      <div class="quick" id="quick"></div>
+      <div class="grip" id="grip" title="Tarik ke atas untuk membuka tas"></div>
+    </div>
+    <div class="invBody" id="invBody">
+      <div class="grid" id="grid"></div>
+      <div class="invBar">
+        <span class="nm" id="selnm">Tinju</span><span class="sub">Tas <b id="cap"></b> · klik item = pegang · pakaian: klik untuk pakai</span>
+        <input type="number" id="qty" min="1" value="1">
+        <button class="btn" id="bdrop">Drop</button>
+        <button class="btn warn" id="btrash">Buang</button>
+      </div>
+    </div>
+  </div>
+  <div class="chatbox min" id="chatbox">
+    <button class="chatPull" id="chatPull" title="Buka / tutup chat"></button>
+    <div class="chatTabs" id="chatTabs">
+      <button class="ctab" data-f="all">SEMUA</button><button class="ctab" data-f="chat">CHAT</button>
+      <button class="ctab" data-f="sys">SISTEM</button><button class="ctab" data-f="act">AKTIVITAS</button>
+      <span class="cworld"><span id="guestTag">TAMU</span><b id="wname">START</b></span>
+      <button class="ctab tog" id="chatToggle" title="Kecilkan / besarkan"></button>
+    </div>
+    <div id="chatlog"></div>
+    <form id="chatForm"><input id="chatIn" maxlength="120" placeholder="Enter / T untuk chat · /help"></form>
+  </div>
+  <div class="toast card" id="toast"></div>
+
+  <div class="modal hidden" id="shop"><div class="win card shopWin">
+    <h2><button class="btn" id="shopBackCat">‹ Kategori</button> Toko TileGrow <span class="shopGem"><img id="shopGemIcon" alt=""><span id="shopGems">0</span></span></h2>
+    <div class="scroll" id="shopList"></div>
+    <div class="shopFoot"><div class="shopInfo" id="shopInfo"></div>
+      <div class="shopBtns"><button class="btn primary" id="shopBuy" disabled>Beli</button><button class="btn" id="shopBack">Kembali</button></div></div>
+  </div></div>
+
+  <div class="modal hidden" id="prof"><div class="win card">
+    <h2><span class="avatar">🔧</span><span><span id="profName">Kamu</span><br><span class="sub" id="profSub"></span></span> <button class="btn x">Tutup</button></h2>
+    <div class="tabs"><button class="tab" data-t="level">Level &amp; Statistik</button><button class="tab" data-t="quest">Quest Harian <span class="badge" id="qbadge">0</span></button><button class="tab" data-t="goals">Goals</button><button class="tab" data-t="bestiary">Bestiary</button></div>
+    <div class="scroll" id="profBody"></div>
+  </div></div>
+
+  <div class="modal hidden" id="menu"><div class="win card" style="width:min(420px,94vw)">
+    <h2>Menu <button class="btn x">Tutup</button></h2>
+    <div class="scroll">
+      <div class="menuBtns">
+        <button class="btn primary" id="mResume">Lanjut main</button>
+        <button class="btn" id="mRespawn">Respawn ke pintu utama</button>
+        <button class="btn" id="mWorlds">World saya / pindah world</button>
+        <button class="btn" id="mLobby">🚪 Exit ke world lobby</button>
+        <button class="btn" id="mControls">Kontrol: <b id="ctlNow">Keyboard &amp; Mouse</b></button>
+        <button class="btn" id="mGuest">Main sebagai Tamu (tes lock)</button>
+        <button class="btn warn" id="mNew">Hapus semua &amp; mulai baru</button>
+        <button class="btn" id="mLogout">Logout</button>
+      </div>
+      <label style="margin-top:14px">Pengaturan</label>
+      <div class="opt"><span>Suara</span><input type="checkbox" id="optSound"></div>
+      <div class="opt"><span>Getar layar</span><input type="checkbox" id="optShake"></div>
+      <div class="opt"><span>Tampilkan grid</span><input type="checkbox" id="optGrid"></div>
+      <div class="opt"><span>Tampilkan nama</span><input type="checkbox" id="optNames"></div>
+      <div class="opt"><span>Label nama pohon</span><input type="checkbox" id="optTree"></div>
+      <div class="opt"><span>Zoom <b id="optZoomV"></b></span><input type="range" id="optZoom" min="1.25" max="2.5" step="0.25"></div>
+      <div class="keys">
+        <kbd>A</kbd><kbd>D</kbd> jalan · <kbd>W</kbd>/<kbd>Space</kbd> lompat · klik kiri pakai item · klik kanan pukul ·
+        <kbd>E</kbd> pecah 2 block depan · <kbd>S</kbd> turun dari platform · <kbd>1</kbd>–<kbd>4</kbd> quick bar (klik 2x slot 1 = Tinju/Kunci Inggris) · <kbd>I</kbd> atau tarik handle biru = buka/tutup tas · <kbd>B</kbd> toko · Kunci Inggris ke diri sendiri / <kbd>L</kbd> = profil, level, quest, bestiary · <kbd>Enter</kbd>/<kbd>T</kbd> chat · <kbd>Esc</kbd> menu · scroll zoom 125–250%
+      </div>
+    </div>
+  </div></div>
+
+  <div class="modal hidden" id="worldsM"><div class="win card" style="width:min(460px,94vw)">
+    <h2>World <button class="btn x">Tutup</button></h2>
+    <p class="note">Progres tiap world tersimpan terpisah. Tas, gems, dan level ikut kamu ke world mana pun. Bisa juga lewat chat: <b>/warp NAMA</b>.</p>
+    <div class="info" style="border:none;margin:0 0 8px;padding:0"><input id="wIn" maxlength="16" placeholder="Nama world (huruf/angka)" style="flex:1;width:auto"><button class="btn primary" id="wGo">Masuk / Buat</button></div>
+    <div class="scroll" id="wList"></div>
+    <div class="info"><button class="btn" id="wRename">Ganti nama world ini</button></div>
+  </div></div>
+
+  <div class="modal hidden" id="dropM"><div class="win card" style="width:min(380px,94vw)">
+    <h2><img id="drIcon" style="width:32px;height:32px;image-rendering:pixelated"> <span id="drName">Item</span></h2>
+    <p style="margin:0 0 6px;font-weight:700">Mau drop berapa?</p>
+    <div class="info" style="border:none;margin:0;padding:0"><input type="number" id="drQty" min="1" value="1" style="width:110px"><span class="note">dari <b id="drMax">1</b></span><button class="btn" id="drMaxBtn">Semua</button></div>
+    <p class="warnBox"><b>AWAS!</b> Setelah di-drop, item ini bukan milikmu lagi dan siapa pun bisa mengambilnya.</p>
+    <div class="info" style="justify-content:flex-end"><button class="btn x">Batal</button><button class="btn warn" id="drOk">Drop</button></div>
+  </div></div>
+
+  <div class="modal hidden" id="exitM"><div class="win card" style="width:min(360px,94vw)">
+    <h2>🚪 Keluar dari world <span id="exName"></span>?</h2>
+    <p class="note">Progres world ini tersimpan. Kamu akan kembali ke world lobby.</p>
+    <div class="info" style="justify-content:flex-end"><button class="btn x">Tetap di sini</button><button class="btn primary" id="exOk">Keluar</button></div>
+  </div></div>
+
+  <div class="modal hidden" id="dlg"><div class="win card" style="width:min(460px,94vw)">
+    <h2 id="dlgTitle">Atur</h2>
+    <div class="scroll" id="dlgBody"></div>
+    <div class="info" style="justify-content:flex-end"><button class="btn x">Batal</button><button class="btn primary" id="dlgSave">Simpan</button></div>
+  </div></div>
+  <!-- layar judul -->
+  <div class="screen" id="scr-title"><div class="sbox card">
+    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice</small></div>
+    <button class="btn primary big" id="tOnline">🌐 Main Online (WiFi/LAN)</button>
+    <button class="btn big" id="tPlay">Main Offline</button>
+    <button class="btn big" id="tOptions">Opsi</button>
+  </div></div>
+
+  <!-- server online -->
+  <div class="screen hidden" id="scr-server"><form class="sbox card" id="svForm" autocomplete="off">
+    <h3>Sambung ke server</h3>
+    <label>Alamat server (IP:port)</label><input id="svAddr" placeholder="192.168.1.10:8080">
+    <div class="err" id="svErr"></div>
+    <button class="btn primary big" type="submit">Sambung</button>
+    <div class="row"><span></span><button type="button" class="btn" id="svBack">Kembali</button></div>
+    <p class="note">Jalankan server di PC host (<b>start-server.bat</b>), lalu pakai alamat yang tampil di jendela server.
+      Kalau game dibuka dari alamat server (http://IP:8080), kolom ini sudah terisi otomatis.</p>
+  </form></div>
+
+  <!-- akun Tiles -->
+  <div class="screen hidden" id="scr-login"><form class="sbox card" id="lgForm" autocomplete="off">
+    <h3>Masuk ke akun Tiles</h3>
+    <label>Username</label><input id="lgUser" maxlength="16">
+    <label>Password</label><input id="lgPass" type="password" maxlength="64">
+    <label>Bendera</label><div class="flags" id="lgFlags"></div>
+    <div class="err" id="lgErr"></div>
+    <button class="btn primary big" type="submit">Masuk</button>
+    <div class="row"><button type="button" class="link" id="lgToReg">Belum punya akun? Buat akun Tiles</button><button type="button" class="btn" id="lgBack">Kembali</button></div>
+    <p class="note modeNote">Akun disimpan di browser perangkat ini. Password tidak disimpan, hanya hash-nya.</p>
+  </form></div>
+  <div class="screen hidden" id="scr-register"><form class="sbox card" id="rgForm" autocomplete="off">
+    <h3>Buat akun Tiles</h3>
+    <label>Username (3–16, hanya huruf &amp; angka)</label><input id="rgUser" maxlength="16">
+    <label>Password (min. 6 karakter)</label><input id="rgPass" type="password" maxlength="64">
+    <label>Ulangi password</label><input id="rgPass2" type="password" maxlength="64">
+    <label>Bendera</label><div class="flags" id="rgFlags"></div>
+    <div class="err" id="rgErr"></div>
+    <button class="btn primary big" type="submit">Buat akun</button>
+    <div class="row"><button type="button" class="link" id="rgToLogin">Sudah punya akun? Masuk</button><button type="button" class="btn" id="rgBack">Kembali</button></div>
+      <p class="note modeNote"></p>
+  </form></div>
+
+  <!-- lobby -->
+  <div class="screen hidden" id="scr-lobby"><div class="wlobby">
+    <div class="wlMsg" id="lbMsg"></div>
+    <div class="wlHead"><span id="lbFlag"></span> <b id="lbUser"></b></div>
+    <form id="lbForm" class="wlName"><span>Nama World:</span><input id="lbWorld" maxlength="16" placeholder="contoh: KEBUNKU" autocomplete="off"></form>
+    <div class="wlHint" id="lbHint"></div><div class="err" id="lbErr"></div>
+    <div class="wlFilter">Menampilkan: <b id="lbFilterName">Semua World</b>
+      <button class="lbtab" data-f="semua">Semua</button><button class="lbtab" data-f="riwayat">Riwayat</button><button class="lbtab" data-f="milikku">Milikku</button></div>
+    <div class="wlWorlds" id="lbWorlds"></div>
+    <div class="wlLegend"><i class="hist"></i> pernah dikunjungi <i class="own"></i> milikku (World Lock) <i class="other"></i> lainnya</div>
+    <div class="wlBtns"><button class="btn big" id="lbBack" type="button">Logout</button><button class="btn primary big" id="lbEnter" type="button">Masuk World</button></div>
+  </div></div>
+
+  <!-- pilih kontrol -->
+  <div class="modal hidden" id="ctlPick" style="z-index:30"><div class="win card" style="width:min(440px,94vw)">
+    <h2>Mau main pakai apa?</h2>
+    <p class="note" id="ctlFirst">Bisa diganti kapan saja di Menu → Kontrol.</p>
+    <div class="menuBtns">
+      <button class="ctl" data-m="kbm"><span class="ic">⌨️</span><span><b>Keyboard &amp; Mouse</b><span>A/D jalan, W/Space lompat, klik kiri pakai item, klik kanan pukul, E pecah depan</span></span></button>
+      <button class="ctl" data-m="touch"><span class="ic">📱</span><span><b>Layar sentuh (Android / iOS)</b><span>Joystick kiri jalan, tombol Lompat &amp; Aksi di kanan, ketuk tile untuk aksi</span></span></button>
+      <button class="ctl" data-m="pad"><span class="ic">🎮</span><span><b>Joystick / Gamepad</b><span>Stik kiri jalan, A lompat, X aksi, stik kanan kursor, LB/RB ganti slot, Y tas, Start menu</span></span></button>
+    </div>
+  </div></div>
+
+  <!-- kontrol layar sentuh -->
+  <div id="touchUI" class="hidden">
+    <button class="tk tL" id="tLeft" aria-label="Kiri"><i></i></button>
+    <button class="tk tD" id="tDown" aria-label="Turun"><i></i></button>
+    <button class="tk tR" id="tRight" aria-label="Kanan"><i></i></button>
+    <button class="tk tA" id="tAct" aria-label="Pakai item"><img id="tActI" alt=""></button>
+    <button class="tk tJ" id="tJump" aria-label="Lompat"><i></i></button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/world.js"></script>
+<script src="js/game.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/net.js"></script>
+<script>
+  function fit(){ cv.width = innerWidth; cv.height = innerHeight; VW = cv.width; VH = cv.height; if (fg) clampCam(); }
+  addEventListener('resize', fit); fit();
+  document.getElementById('gemIcon').src = icon('gem');
+  document.getElementById('shopGemIcon').src = icon('gem');
+</script>
+<script src="js/main.js"></script>
+</body>
+</html>
