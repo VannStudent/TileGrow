@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TileGrow v1.4</title>
 <style>
   :root{ --bg:#0d1017; --line:#2c3447; --text:#eef2f8; --dim:#8d97ab; --accent:#ff9494; --ol:#17121c; }
@@ -389,7 +389,7 @@
     .toast{top:calc(var(--tlTop,120px) + 84px)}
   }
   /* layar sentuh: zoom lewat Menu, FPS disembunyikan */
-  @media (pointer:coarse){ .rstack .zoom, #fps{display:none} }
+  @media (pointer:coarse){ #fps{display:none} }
   /* tas terbuka = kontrol sentuh disembunyikan supaya tidak menumpuk slot tas */
   .inv.open ~ #touchUI{display:none}
   /* ===================== HUD v1.2 — Growtopia persis ===================== */
@@ -488,7 +488,10 @@
     .invBar .sub{display:none} .invBar{flex-wrap:nowrap}
   }
   @media (max-height:500px){ .gtb{width:42px;height:42px} .gtb svg,.gtb img{width:26px;height:26px} .gtR{gap:6px} .gtb.bub svg{width:40px;height:40px} }
-  @media (pointer:coarse){ .gtR .zoom{display:none} }
+  /* layar sentuh: tombol zoom tetap tampil (cubit dua jari juga bisa) */
+  #touchUI, #touchUI *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  #touchUI .tk *{pointer-events:none}
+  canvas{-webkit-touch-callout:none;touch-action:none}
   /* v1.3: menu pemain, teman, report, trade */
   .rrow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
   .rr{padding:6px 10px;border-radius:99px;border:2px solid var(--ol);background:#2e3850;color:#cfe6ff;font-size:12px;font-weight:700;cursor:pointer}
@@ -701,7 +704,7 @@
   </div></div>
   <!-- layar judul -->
   <div class="screen" id="scr-title"><div class="sbox card">
-    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice · v1.4</small></div>
+    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice · v1.4.1</small></div>
     <button class="btn primary big" id="tOnline">🌐 Main Online (WiFi/LAN)</button>
     <button class="btn big" id="tPlay">Main Offline</button>
     <button class="btn big" id="tOptions">Opsi</button>

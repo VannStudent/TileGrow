@@ -32,11 +32,18 @@ function bindControlPicker(){
 // tombol lompat = tombol Atas (di pintu utama: keluar world, sama seperti W)
 const touch = {act:false};
 function bindTouch(){
-  const hold = (id, on, off) => { const b = $(id); let pid = null;
-    const up = e => { if (pid === null || (e && e.pointerId !== pid)) return; pid = null; off(); b.classList.remove('down'); };
-    b.addEventListener('pointerdown', e => { pid = e.pointerId; try { b.setPointerCapture(pid); } catch(_){} on(); b.classList.add('down'); e.preventDefault(); });
-    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
-    b.addEventListener('contextmenu', e => e.preventDefault()); };
+  // tombol tahan: dengar pointer DAN touch (WebView Android lama / BlueStacks kadang hanya kirim salah satu,
+  // atau membatalkan pointer saat ditekan lama). Lepas hanya saat jari benar-benar diangkat.
+  const hold = (id, on, off) => { const b = $(id); let down = false;
+    const start = e => { e.preventDefault(); if (down) return; down = true; on(); b.classList.add('down'); };
+    const stop = e => { if (e && e.touches && [...e.touches].some(t => t.target === b || b.contains(t.target))) return;   // jari lain masih di tombol ini
+      if (!down) return; down = false; off(); b.classList.remove('down'); };
+    b.addEventListener('pointerdown', e => { try { b.setPointerCapture(e.pointerId); } catch(_){} start(e); });
+    b.addEventListener('touchstart', start, {passive:false});
+    b.addEventListener('pointerup', stop); b.addEventListener('touchend', stop); b.addEventListener('touchcancel', stop);
+    b.addEventListener('mouseup', stop); b.addEventListener('mouseleave', stop);
+    b.addEventListener('contextmenu', e => e.preventDefault());
+    b.querySelectorAll('img').forEach(i => { i.draggable = false; }); };
   hold('tLeft', ()=> keys.KeyA = true, ()=> keys.KeyA = false);
   hold('tRight', ()=> keys.KeyD = true, ()=> keys.KeyD = false);
   hold('tDown', ()=> keys.KeyS = true, ()=> keys.KeyS = false);
