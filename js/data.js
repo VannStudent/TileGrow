@@ -429,14 +429,16 @@ function makeTex(id, v){
   return c;
 }
 // 4 varian tiap block, dipilih per tile dari hash posisi supaya tidak berulang
+const HAS_T3 = typeof makeTex32 === 'function';                      // texture pack v3 (32px); server vm tidak memuatnya
 const TEXV = {};
-for (const id in BY_ID) if (+id && +id !== 8){ TEXV[+id] = []; for (let v=0; v<TEXVAR; v++) TEXV[+id].push(makeTex(+id, v)); }
+for (const id in BY_ID) if (+id && +id !== 8){ TEXV[+id] = []; for (let v=0; v<TEXVAR; v++){
+  const t3 = HAS_T3 ? makeTex32(+id, v) : null; TEXV[+id].push(t3 || makeTex(+id, v)); } }
 const TEX = {}; for (const id in TEXV) TEX[id] = TEXV[id][0];
 function tileHash(x,y){ let h = (x*73856093) ^ (y*19349663); h = (h ^ (h >>> 13)) * 1274126177; return (h >>> 0) % TEXVAR; }
 function texAt(id, x, y){ const v = TEXV[id]; return v ? v[tileHash(x,y)] : TEX[id]; }
 
 // rumput ala Growtopia: bilah tebal, ujung terang, bayangan di bawah
-const GRASSV = [0,1,2,3].map(v => { const c=newCanvas(16), g=c.getContext('2d'), r=rng(77+v*31);
+const GRASSV = [0,1,2,3].map(v => { if (HAS_T3) return makeGrass32(v); const c=newCanvas(16), g=c.getContext('2d'), r=rng(77+v*31);
   for (let x=0;x<16;x++){
     const d = 3 + (r()<.4?1:0) + (r()<.2?2:0);
     px(g,x,0,'#3f9a2c',1,d+1); px(g,x,0,'#6fd34a',1,d); px(g,x,0,'#a8f07a',1,1); px(g,x,d+1,'#2a6a1c',1,1);

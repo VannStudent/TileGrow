@@ -28,53 +28,115 @@ function drawBlockIcon(g, x, y, size, id){
   g.fillStyle = OL; g.fillRect(x-2, y-2, size+4, size+4);
   g.imageSmoothingEnabled = false; g.drawImage(TEX[id], x, y, size, size);
 }
-// sayap kartun (dipakai juga sebagai ikon)
-function wingPath(g, s, up){
-  g.beginPath(); g.moveTo(0,0);
-  g.quadraticCurveTo(10*s, -14*s - up, 22*s, -10*s - up*.6);
-  g.quadraticCurveTo(18*s, -4*s, 20*s, 0);
-  g.quadraticCurveTo(14*s, 2*s, 16*s, 7*s);
-  g.quadraticCurveTo(8*s, 6*s, 0, 4*s); g.closePath();
-}
+// sayap v3: gaya pixel chunky ala Growtopia (desain sendiri). Garis luar = warna sayap yang digelapkan,
+// bulu terpisah jelas, kilau di atas. dir = 1 kanan / -1 kiri, up = kepakan (derajat kecil).
+function wingShape(g, path, fill, ol, lw){ g.lineJoin = 'round'; g.lineWidth = lw; g.strokeStyle = ol; path(); g.stroke(); g.fillStyle = fill; path(); g.fill(); }
 function drawWing(g, x, y, s, dir, up, w){
-  g.save(); g.translate(x, y); g.scale(dir, 1);
-  const devil = w.key === 'w_devil';
-  g.fillStyle = OL; g.save(); g.scale(1.12,1.15); wingPath(g, s, up); g.fill(); g.restore();
-  g.fillStyle = w.color[0]; wingPath(g, s, up); g.fill();
-  g.strokeStyle = w.color[1]; g.lineWidth = 1.4*s; g.beginPath();
-  if (devil){ g.moveTo(2*s,1*s); g.lineTo(18*s,-8*s - up*.6); g.moveTo(3*s,2*s); g.lineTo(17*s,1*s); }
-  else { for (const k of [6,11,16]){ g.moveTo(k*s, -5*s - up*.3); g.lineTo(k*s - 2*s, 3*s); } }
-  g.stroke();
-  g.fillStyle = w.color[2]; g.globalAlpha = .6; g.beginPath(); g.ellipse(8*s, -6*s - up*.4, 4*s, 2*s, -.4, 0, Math.PI*2); g.fill(); g.globalAlpha = 1;
+  const [c0, c1, c2] = w.color, ol = shadeHex(c1, -60), lw = 2.6*s;
+  g.save(); g.translate(x, y); g.scale(dir, 1); g.rotate(-(up || 0)*.035);
+  const k = w.key || '';
+  if (k === 'w_devil'){
+    // sayap kelelawar: 3 tulang runcing, selaput bergerigi di bawah
+    const mem = ()=>{ g.beginPath(); g.moveTo(0, -2*s); g.lineTo(7*s, -19*s); g.lineTo(12*s, -11*s); g.lineTo(19*s, -24*s);
+      g.lineTo(23*s, -12*s); g.lineTo(28*s, -16*s); g.lineTo(27*s, -2*s);
+      g.quadraticCurveTo(23*s, -3*s, 21*s, 4*s); g.quadraticCurveTo(17*s, 0, 13*s, 7*s); g.quadraticCurveTo(9*s, 2*s, 5*s, 6*s); g.lineTo(0, 3*s); g.closePath(); };
+    wingShape(g, mem, c0, ol, lw);
+    g.save(); mem(); g.clip();
+    g.fillStyle = c1; g.beginPath(); g.moveTo(0, 3*s); g.lineTo(27*s, -2*s); g.lineTo(28*s, 10*s); g.lineTo(0, 10*s); g.closePath(); g.fill();   // bawah lebih gelap
+    g.fillStyle = c2; g.globalAlpha = .55; g.beginPath(); g.moveTo(1*s, -3*s); g.lineTo(7*s, -17*s); g.lineTo(10*s, -11*s); g.closePath(); g.fill(); g.globalAlpha = 1;
+    g.restore();
+    g.strokeStyle = ol; g.lineWidth = 1.6*s; g.lineCap = 'round'; g.beginPath();
+    for (const [tx, ty] of [[7, -19], [19, -24], [28, -16]]){ g.moveTo(1*s, 0); g.lineTo(tx*s, ty*s); }
+    g.stroke();
+    g.fillStyle = shadeHex(c2, 20); for (const [tx, ty] of [[7, -19], [19, -24], [28, -16]]){ g.beginPath(); g.arc(tx*s, ty*s, 1.3*s, 0, Math.PI*2); g.fill(); }
+  } else if (k === 'w_storm'){
+    // sayap badai: 5 bulu runcing besar dikipas dari punggung ke atas-luar, ujung putih, kilat kuning
+    const fan = [[-1.25, 22], [-.92, 27], [-.6, 28], [-.28, 25], [.05, 19]];
+    for (let i = 0; i < fan.length; i++){
+      const [a0, L] = fan[i], base = shadeHex(c0, (2 - i)*8);
+      g.save(); g.rotate(a0);
+      const fe = ()=>{ g.beginPath(); g.moveTo(0, -3.5*s); g.quadraticCurveTo(L*.55*s, -6.5*s, L*s, 0); g.quadraticCurveTo(L*.55*s, 5.5*s, 0, 3.5*s); g.closePath(); };
+      wingShape(g, fe, base, ol, lw);
+      g.save(); fe(); g.clip(); g.fillStyle = c1; g.fillRect(0, 1.4*s, L*s, 6*s); g.fillStyle = c2; g.fillRect(L*.74*s, -7*s, L*.3*s, 14*s); g.restore();
+      g.restore();
+    }
+    g.fillStyle = '#fff36a'; g.strokeStyle = ol; g.lineWidth = 1.4*s; g.lineJoin = 'round'; g.beginPath();
+    g.moveTo(25*s, -20*s); g.lineTo(19*s, -11*s); g.lineTo(23*s, -11*s); g.lineTo(18*s, -2*s); g.lineTo(28*s, -14*s); g.lineTo(23.5*s, -14*s); g.closePath(); g.stroke(); g.fill();
+  } else {
+    for (const [x0, y0, L, ang] of [[27, -16, 13, 1.05], [23, -9, 12, 1.25], [18, -4, 10, 1.45], [12, 0, 8, 1.6]]){
+      const pf = ()=>{ g.beginPath(); g.moveTo((x0 - 3)*s, y0*s); g.quadraticCurveTo((x0 + Math.cos(ang)*L*.5 - 3)*s, (y0 + Math.sin(ang)*L*.6)*s, (x0 + Math.cos(ang)*L)*s, (y0 + Math.sin(ang)*L)*s);
+        g.quadraticCurveTo((x0 + Math.cos(ang)*L*.5 + 3)*s, (y0 + Math.sin(ang)*L*.4)*s, (x0 + 3)*s, (y0 - 1)*s); g.closePath(); };
+      wingShape(g, pf, c1, ol, lw);
+    }
+    // sayap malaikat: siluet menyapu ke atas-luar, tepi bawah bergelombang (bulu), 3 tingkat bulu, ujung bulu panjang
+    const sil = ()=>{ g.beginPath(); g.moveTo(0, 2*s);
+      g.quadraticCurveTo(4*s, -16*s, 20*s, -24*s); g.quadraticCurveTo(28*s, -27*s, 30*s, -22*s);   // tepi atas
+      // tepi bawah: 5 lekuk bulu dari ujung ke pangkal
+      const sc = [[30, -22], [29, -13], [25, -6], [19, -1], [12, 2], [5, 4]];
+      for (let i = 1; i < sc.length; i++){ const [x0, y0] = sc[i-1], [x1, y1] = sc[i];
+        g.quadraticCurveTo(((x0 + x1)/2 + 2.5)*s, ((y0 + y1)/2 + 3.5)*s, x1*s, y1*s); }
+      g.closePath(); };
+    wingShape(g, sil, c0, ol, lw);
+    g.save(); sil(); g.clip();
+    // tingkat bulu dalam: pita gelap di bawah, terang di atas
+    g.fillStyle = c1; g.beginPath(); g.moveTo(0, 6*s); g.lineTo(32*s, -14*s); g.lineTo(32*s, 10*s); g.lineTo(0, 10*s); g.closePath(); g.fill();
+    g.fillStyle = c2; g.beginPath(); g.ellipse(15*s, -16*s, 11*s, 3.2*s, -.55, 0, Math.PI*2); g.fill();
+    g.restore();
+    // garis lekuk bulu (2 baris) supaya terbaca sebagai bulu, bukan awan
+    g.strokeStyle = shadeHex(c1, -25); g.lineWidth = 1.2*s; g.lineCap = 'round';
+    for (const row of [[[8, -6], [14, -10], [20, -14], [25, -17]], [[6, -1], [12, -4], [18, -7], [24, -10]]]){
+      g.beginPath();
+      for (const [x, y] of row){ g.moveTo((x - 2.5)*s, (y - 1.5)*s); g.quadraticCurveTo((x + .5)*s, (y + 2.2)*s, (x + 3)*s, (y - 1.8)*s); }
+      g.stroke();
+    }
+    g.lineCap = 'butt';
+  }
   g.restore();
 }
-function drawWingIcon(g, cx, cy, w){ drawWing(g, cx, cy, .62, 1, 0, w); drawWing(g, cx, cy, .62, -1, 0, w); }
+function drawWingIcon(g, cx, cy, w){ drawWing(g, cx + 1, cy + 4, .5, 1, 0, w); drawWing(g, cx - 1, cy + 4, .5, -1, 0, w); }
 // ----- pakaian -----
 function drawHat(g, w, f){
-  const [c0,c1,c2] = w.color, O = (fn)=>{ g.fillStyle = OL; fn(); };
+  // topi v3: membungkus kepala besar (r≈13), garis luar tebal, sisi terang kiri-atas + bayangan, kilau kecil
+  const [c0, c1, c2] = w.color;
   g.lineJoin = 'round';
-  const blob = (path, fill)=>{ g.fillStyle = OL; g.save(); g.lineWidth = 4; g.strokeStyle = OL; path(); g.stroke(); g.restore(); g.fillStyle = fill; path(); g.fill(); };
+  const blob = (path, fill)=>{ g.save(); g.lineWidth = 3.4; g.strokeStyle = OL; path(); g.stroke(); g.restore(); g.fillStyle = fill; path(); g.fill(); };
+  const shade = (path, c)=>{ g.save(); path(); g.clip(); g.fillStyle = shadeHex(c, -30); g.fillRect(f > 0 ? 3 : -30, -30, 27, 40); g.fillStyle = shadeHex(c, 35); g.fillRect(f > 0 ? -30 : 20, -30, 10, 40); g.restore(); };
+  const dome = (r, y)=>()=>{ g.beginPath(); g.arc(0, y, r, Math.PI, 0); g.closePath(); };
   if (w.style === 'cowboy'){
-    blob(()=>{ g.beginPath(); g.ellipse(0, -2, 19, 4, 0, 0, Math.PI*2); }, c0);
-    blob(()=>{ g.beginPath(); g.roundRect(-9, -14, 18, 12, 5); }, c0);
-    g.fillStyle = c1; g.fillRect(-9, -5, 18, 3);
+    const crown = ()=>{ g.beginPath(); g.moveTo(-10, 0); g.lineTo(-9, -12); g.quadraticCurveTo(-5, -16, 0, -13); g.quadraticCurveTo(5, -16, 9, -12); g.lineTo(10, 0); g.closePath(); };
+    const brim = ()=>{ g.beginPath(); g.moveTo(-21, -4); g.quadraticCurveTo(-16, 2, 0, 2); g.quadraticCurveTo(16, 2, 21, -4); g.quadraticCurveTo(14, 4, 0, 4.5); g.quadraticCurveTo(-14, 4, -21, -4); g.closePath(); };
+    blob(crown, c0); shade(crown, c0);
+    g.fillStyle = c1; g.fillRect(-10, -4.5, 20, 3.5); g.fillStyle = c2; g.fillRect(-3, -4.5, 4, 3.5);
+    blob(brim, shadeHex(c0, -8));
   } else if (w.style === 'crown'){
-    blob(()=>{ g.beginPath(); g.moveTo(-11,-1); g.lineTo(-11,-12); g.lineTo(-6,-6); g.lineTo(0,-15); g.lineTo(6,-6); g.lineTo(11,-12); g.lineTo(11,-1); g.closePath(); }, c0);
-    g.fillStyle = '#e04848'; g.beginPath(); g.arc(0,-5,2,0,Math.PI*2); g.fill();
-    g.fillStyle = c2; g.fillRect(-9,-4,18,1.5);
+    const cr = ()=>{ g.beginPath(); g.moveTo(-12, 0); g.lineTo(-13, -13); g.lineTo(-6.5, -7); g.lineTo(0, -16); g.lineTo(6.5, -7); g.lineTo(13, -13); g.lineTo(12, 0); g.closePath(); };
+    blob(cr, c0); shade(cr, c0);
+    g.fillStyle = c1; g.fillRect(-12, -4, 24, 4);
+    for (const [x, col] of [[-7, '#3fa8ff'], [0, '#e8344a'], [7, '#3fd17a']]){ g.fillStyle = OL; g.beginPath(); g.arc(x, -2, 2.4, 0, Math.PI*2); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(x, -2, 1.6, 0, Math.PI*2); g.fill(); }
+    for (const [x, y] of [[-13, -13], [0, -16], [13, -13]]){ g.fillStyle = OL; g.beginPath(); g.arc(x, y, 2.4, 0, Math.PI*2); g.fill(); g.fillStyle = c2; g.beginPath(); g.arc(x, y, 1.5, 0, Math.PI*2); g.fill(); }
   } else if (w.style === 'cap'){
-    blob(()=>{ g.beginPath(); g.arc(0, -2, 11, Math.PI, 0); g.closePath(); }, c0);
-    blob(()=>{ g.beginPath(); g.roundRect(f > 0 ? 4 : -18, -4, 14, 4, 2); }, c1);
-    g.fillStyle = c2; g.beginPath(); g.arc(0, -12, 1.8, 0, Math.PI*2); g.fill();
+    const d = dome(13.5, 0);
+    blob(d, c0); shade(d, c0);
+    g.fillStyle = shadeHex(c0, -20); g.fillRect(-1, -13, 2, 13);
+    blob(()=>{ g.beginPath(); g.roundRect(f > 0 ? 6 : -18, -2.5, 12, 4.5, [1, 3, 3, 1]); }, c1);
+    g.fillStyle = OL; g.beginPath(); g.arc(0, -13.5, 2.3, 0, Math.PI*2); g.fill(); g.fillStyle = c2; g.beginPath(); g.arc(0, -13.5, 1.4, 0, Math.PI*2); g.fill();
+    g.fillStyle = c2; g.beginPath(); g.arc(-4*f, -6, 3, 0, Math.PI*2); g.fill();                                            // logo
   } else if (w.style === 'miner'){
-    blob(()=>{ g.beginPath(); g.arc(0, -1, 12, Math.PI, 0); g.closePath(); }, c0);
-    blob(()=>{ g.beginPath(); g.roundRect(-14, -3, 28, 4, 2); }, c1);
-    g.fillStyle = OL; g.fillRect(-4, -11, 8, 6); g.fillStyle = '#fff6c4'; g.fillRect(-3, -10, 6, 4);
-  } else {
-    blob(()=>{ g.beginPath(); g.arc(0, -1, 12, Math.PI, 0); g.closePath(); }, c0);
-    g.fillStyle = c1; for (let x=-10;x<=8;x+=4) g.fillRect(x, -9, 2, 8);
-    blob(()=>{ g.beginPath(); g.roundRect(-12, -3, 24, 4, 2); }, c2);
-    g.fillStyle = OL; g.beginPath(); g.arc(0,-14,3.5,0,Math.PI*2); g.fill(); g.fillStyle = c2; g.beginPath(); g.arc(0,-14,2.4,0,Math.PI*2); g.fill();
+    const d = ()=>{ g.beginPath(); g.arc(0, -.5, 14, Math.PI, 0); g.closePath(); };
+    blob(d, c0); shade(d, c0);
+    g.fillStyle = shadeHex(c0, -22); g.fillRect(-1.2, -14, 2.4, 13);
+    blob(()=>{ g.beginPath(); g.roundRect(-16, -2.5, 32, 4.5, 2); }, c1);
+    blob(()=>{ g.beginPath(); g.roundRect(-4.5 + 3*f, -12, 9, 7, 2); }, '#5a5f6e');
+    g.fillStyle = '#fff6c4'; g.beginPath(); g.arc(3*f, -8.5, 2.6, 0, Math.PI*2); g.fill();
+    g.fillStyle = 'rgba(255,246,196,.25)'; g.beginPath(); g.moveTo(3*f, -8.5); g.lineTo(26*f, -15); g.lineTo(26*f, -2); g.closePath(); g.fill();
+  } else {   // beanie
+    const d = ()=>{ g.beginPath(); g.moveTo(-13.5, 0); g.quadraticCurveTo(-14, -15, 0, -15); g.quadraticCurveTo(14, -15, 13.5, 0); g.closePath(); };
+    blob(d, c0); shade(d, c0);
+    g.save(); d(); g.clip(); g.fillStyle = c1; for (let x = -12; x <= 10; x += 5) g.fillRect(x, -15, 2.2, 15); g.restore();
+    blob(()=>{ g.beginPath(); g.roundRect(-14.5, -4, 29, 5.5, 2.5); }, c2);
+    g.fillStyle = shadeHex(c2, -25); for (let x = -12; x <= 12; x += 3) g.fillRect(x, -3.5, 1, 4.5);
+    blob(()=>{ g.beginPath(); g.arc(0, -16, 4, 0, Math.PI*2); }, c2);
+    g.fillStyle = shadeHex(c2, 40); g.fillRect(-2, -18, 2, 1.4);
   }
 }
 function drawShirtIcon(g, w){
@@ -84,13 +146,32 @@ function drawShirtIcon(g, w){
   shirtDetail(g, w, 10, 9, 12, 16);
 }
 function shirtDetail(g, w, x, y, wd, h){
-  const [c0,c1,c2] = w.color;
-  if (w.style === 'stripe'){ g.fillStyle = c1; for (let k=y+2;k<y+h;k+=4) g.fillRect(x, k, wd, 2); }
-  else if (w.style === 'jacket'){ g.fillStyle = c2; g.fillRect(x + wd/2 - .75, y, 1.5, h); g.fillStyle = '#cfd6e0'; g.fillRect(x + wd/2 - 3, y, 6, 3); }
-  else if (w.style === 'suit'){ g.fillStyle = '#f2f2f2'; g.beginPath(); g.moveTo(x+wd/2-3,y); g.lineTo(x+wd/2+3,y); g.lineTo(x+wd/2,y+6); g.closePath(); g.fill();
-    g.fillStyle = '#e04848'; g.fillRect(x + wd/2 - 1, y + 2, 2, 6); }
-  else if (w.style === 'hoodie'){ g.fillStyle = c1; g.fillRect(x + 2, y + h - 6, wd - 4, 4); g.fillStyle = c2; g.fillRect(x+wd/2-3, y, 1.2, 5); g.fillRect(x+wd/2+2, y, 1.2, 5); }
-  else { g.fillStyle = c2; g.fillRect(x + 1, y + 1, 3, h - 4); }
+  // detail baju v3: lebih besar dan jelas di badan 17x11
+  const [c0, c1, c2] = w.color, cx = x + wd/2;
+  if (w.style === 'stripe'){ g.fillStyle = c1; for (let k = y + 1.5; k < y + h; k += 3.6) g.fillRect(x, k, wd, 1.8); }
+  else if (w.style === 'jacket'){
+    g.fillStyle = shadeHex(c0, -25); g.fillRect(cx - 4, y, 8, h);                                      // kaos dalam
+    g.fillStyle = '#e9eef5'; g.fillRect(cx - 3, y, 6, h);
+    g.fillStyle = c0; g.beginPath(); g.moveTo(cx - 4, y); g.lineTo(cx - 1, y + 4); g.lineTo(cx - 4, y + h); g.closePath(); g.fill();   // kerah lipat
+    g.beginPath(); g.moveTo(cx + 4, y); g.lineTo(cx + 1, y + 4); g.lineTo(cx + 4, y + h); g.closePath(); g.fill();
+    g.fillStyle = c2; g.fillRect(cx - .6, y + 4, 1.2, h - 4);                                         // ritsleting
+    g.fillStyle = shadeHex(c0, -30); g.fillRect(x + 1.5, y + h - 4, 4, 1.2); g.fillRect(x + wd - 5.5, y + h - 4, 4, 1.2);   // saku
+  }
+  else if (w.style === 'suit'){
+    g.fillStyle = '#f4f4f4'; g.beginPath(); g.moveTo(cx - 4, y); g.lineTo(cx + 4, y); g.lineTo(cx, y + 8); g.closePath(); g.fill();
+    g.fillStyle = '#d83a3a'; g.beginPath(); g.moveTo(cx - 1.2, y + 1); g.lineTo(cx + 1.2, y + 1); g.lineTo(cx + 1.6, y + 7); g.lineTo(cx, y + 9); g.lineTo(cx - 1.6, y + 7); g.closePath(); g.fill();
+    g.fillStyle = shadeHex(c0, 30); g.beginPath(); g.moveTo(cx - 4, y); g.lineTo(cx - 6, y + 3); g.lineTo(cx - 1, y + 8); g.closePath(); g.fill();   // kerah jas
+    g.beginPath(); g.moveTo(cx + 4, y); g.lineTo(cx + 6, y + 3); g.lineTo(cx + 1, y + 8); g.closePath(); g.fill();
+    g.fillStyle = '#e0c060'; g.fillRect(cx - .6, y + 9, 1.2, 1.2);
+  }
+  else if (w.style === 'hoodie'){
+    g.fillStyle = shadeHex(c0, -28); g.beginPath(); g.ellipse(cx, y, 7, 2.6, 0, 0, Math.PI); g.fill();     // tudung di leher
+    g.fillStyle = c1; g.beginPath(); g.roundRect(x + 3, y + h - 5.5, wd - 6, 4.5, 1.5); g.fill();       // kantong depan
+    g.fillStyle = shadeHex(c1, -25); g.fillRect(x + 3, y + h - 5.5, wd - 6, 1);
+    g.fillStyle = c2; g.fillRect(cx - 3, y + 1, 1.2, 5); g.fillRect(cx + 1.8, y + 1, 1.2, 5);            // tali
+    g.beginPath(); g.arc(cx - 2.4, y + 6.3, 1, 0, Math.PI*2); g.arc(cx + 2.4, y + 6.3, 1, 0, Math.PI*2); g.fill();
+  }
+  else { g.fillStyle = c2; g.fillRect(cx - 4, y, 8, 2.2); g.fillStyle = shadeHex(c0, -20); g.fillRect(cx - .6, y + 2, 1.2, 4); }
 }
 function drawPantsIcon(g, w){
   const [c0,c1] = w.color;
@@ -209,81 +290,118 @@ function drawPlayer(rx, ry){
   ctx.translate(x, ground); ctx.scale(sqx*PS, sqy*PS);
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, 13, 3.5, 0, 0, Math.PI*2); ctx.fill();
 
+  // ---- v3: badan chibi ala Growtopia — kepala besar, badan kotak lebar, lengan berlengan baju, sepatu jelas ----
   let la = 0, lb = 0;
   if (walking){ la = Math.sin(ph)*5; lb = -la; }
   else if (!pl.onGround){ la = pl.vy < 0 ? -3 : 2; lb = pl.vy < 0 ? 3 : -2; }
-  const legY = -12 - bob*.3, air = pl.onGround ? 0 : 2;
-  const leg = (dx, sw, c)=>{
-    ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(dx - 4 + sw*.4, legY - 1, 8, 13 - air, 3); ctx.fill();
-    ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(dx - 2.5 + sw*.4, legY, 5, 10 - air, 2); ctx.fill();
-    ctx.fillStyle = '#3a2a22'; ctx.fillRect(dx - 3 + sw, -3 - air, 7, 3);
+  const air = pl.onGround ? 0 : 2;
+  const P = worn.pants ? WEAR[worn.pants].color : ['#3d4f86','#2a3866','#5a6fb0'];
+  const SW = worn.shirt ? WEAR[worn.shirt] : null;
+  const shirt = hurtFlash ? '#ffffff' : SW ? SW.color[0] : '#e8584a', shirtD = SW ? SW.color[1] : '#a83428', shirtL = SW ? SW.color[2] : '#ff8a78';
+  const skin = hurtFlash ? '#ffd8c8' : '#f6c7a0', skinD = '#d9986e';
+  const rr = (x, y, w, h, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
+  // kaki + sepatu (sepatu lebih lebar dari kaki, ujung menghadap arah jalan)
+  const leg = (dx, sw)=>{
+    const lx = dx + sw*.45;
+    rr(lx - 4.5, -15 - bob*.2, 9, 14 - air, 3, OL);
+    rr(lx - 3, -14 - bob*.2, 6, 11 - air, 2, P[0]);
+    ctx.fillStyle = shadeHex(P[0], -24); ctx.fillRect(lx + 1, -14 - bob*.2, 2, 11 - air);
+    const sx0 = lx - 5 + (f > 0 ? 1 : -2);
+    rr(sx0 - 1, -5 - air, 13, 6, 3, OL);
+    rr(sx0, -4 - air, 11, 4, 2, '#2b1f1b');
+    ctx.fillStyle = '#6a4c40'; ctx.fillRect(sx0 + 1, -4 - air, 8, 1.2);
   };
   if (wingsDef()){
     const W = wingsDef();
     const flapUp = pl.flap > 0 ? Math.sin((1 - pl.flap/.3) * Math.PI) * 10 : (!pl.onGround ? Math.sin(now/90)*4 : Math.sin(now/600)*1.5);
-    drawWing(ctx, -2*f, -26 - bob, 1, -f, flapUp, W);
-    drawWing(ctx,  2*f, -27 - bob, 1,  f, flapUp*.8, W);
+    const wy = W.key === 'w_devil' ? -25 : -24;          // pangkal sayap di punggung atas, bukan di kepala
+    drawWing(ctx, -3*f, wy - bob, .92, -f, flapUp, W);
+    drawWing(ctx,  3*f, wy - 1 - bob, .92,  f, flapUp*.8, W);
   }
-  const P = worn.pants ? WEAR[worn.pants].color : ['#3b4a7a','#4a5b91'];
-  leg(-3*f, -la*f, P[0]); leg(3*f, -lb*f, P[1] === P[0] ? P[0] : (worn.pants ? P[0] : P[1]));
+  leg(-3.5*f, -la*f); leg(3.5*f, -lb*f);
 
-  const SW = worn.shirt ? WEAR[worn.shirt] : null;
-  const by = -24 - bob, shirt = hurtFlash ? '#ffffff' : SW ? SW.color[0] : '#ff9494';
-  ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(-8, by - 1, 16, 15, 5); ctx.fill();
-  ctx.fillStyle = shirt; ctx.beginPath(); ctx.roundRect(-6.5, by, 13, 12.5, 4); ctx.fill();
-  if (SW && !hurtFlash){ ctx.save(); ctx.beginPath(); ctx.roundRect(-6.5, by, 13, 12.5, 4); ctx.clip(); shirtDetail(ctx, SW, -6.5, by, 13, 12.5); ctx.restore(); }
-  else ctx.fillStyle = '#ffbaba', ctx.fillRect(-5, by + 1.5, 3, 7);
+  // badan: kotak membulat lebar, bayangan sisi, kerah
+  const by = -27 - bob;
+  rr(-10, by - 1, 20, 16, 5, OL);
+  rr(-8.5, by, 17, 13.5, 4, shirt);
+  ctx.save(); ctx.beginPath(); ctx.roundRect(-8.5, by, 17, 13.5, 4); ctx.clip();
+  ctx.fillStyle = shirtD; ctx.fillRect(f > 0 ? 4 : -8.5, by, 4.5, 14);          // sisi gelap (belakang)
+  ctx.fillStyle = shirtL; ctx.fillRect(f > 0 ? -8.5 : 5.5, by, 3, 14);          // sisi terang (depan)
+  ctx.fillStyle = shadeHex(P[0], 0); ctx.fillRect(-9, by + 11, 18, 3);           // pinggang celana
+  ctx.fillStyle = '#2a2018'; ctx.fillRect(-9, by + 10.6, 18, 1.2);               // ikat pinggang
+  if (SW && !hurtFlash) shirtDetail(ctx, SW, -8.5, by, 17, 11);
+  ctx.restore();
+  ctx.fillStyle = skinD; ctx.beginPath(); ctx.ellipse(0, by + .5, 4, 1.6, 0, 0, Math.PI*2); ctx.fill();   // leher
 
+  // lengan: lengan baju + tangan bulat
   const shY = by + 3;
   const arm = (ang, front)=>{
-    ctx.save(); ctx.translate(f*(front?4:-3), shY); ctx.rotate(ang);
-    ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(-3, -2, 6, 14, 3); ctx.fill();
-    ctx.fillStyle = front ? shirt : (SW ? SW.color[1] : '#e07c7c'); ctx.beginPath(); ctx.roundRect(-1.8, -1, 3.6, 10, 2); ctx.fill();
-    ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, 12, 4.2, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#f2c79e'; ctx.beginPath(); ctx.arc(0, 12, 3, 0, Math.PI*2); ctx.fill();
+    ctx.save(); ctx.translate(f*(front ? 8.5 : -7.5), shY); ctx.rotate(ang);
+    rr(-3.6, -2.5, 7.2, 14, 3.5, OL);
+    rr(-2.3, -1.5, 4.6, 7.5, 2, front ? shirt : shirtD);                     // lengan baju
+    rr(-2.3, 5, 4.6, 4.5, 2, front ? skin : skinD);                           // lengan bawah
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, 11, 4.4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = front ? skin : skinD; ctx.beginPath(); ctx.arc(0, 11, 3.2, 0, Math.PI*2); ctx.fill();
+    if (front){ ctx.fillStyle = '#ffe2c8'; ctx.beginPath(); ctx.arc(-1, 10, 1.1, 0, Math.PI*2); ctx.fill(); }
     ctx.restore();
   };
-  const idle = walking ? Math.sin(ph)*.6 : (pl.onGround ? Math.sin(now/500)*.05 : -.9*f);
+  const idle = walking ? Math.sin(ph)*.6 : (pl.onGround ? -.28*f + Math.sin(now/500)*.05 : -.9*f);
   arm(-idle, false);
 
-  const hy = by - 13;
-  ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, hy, 14, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = hurtFlash ? '#ffd0c0' : '#f2c79e'; ctx.beginPath(); ctx.arc(0, hy, 12, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#ffe1c4'; ctx.beginPath(); ctx.arc(-4*f, hy - 5, 4, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#4a2f24'; ctx.beginPath(); ctx.arc(0, hy - 2, 12, Math.PI*1.05, Math.PI*1.95); ctx.fill();
-  ctx.fillRect(f > 0 ? -12 : 8, hy - 6, 4, 6);
+  // kepala: bulat besar, telinga, rambut bervolume dengan poni
+  const hy = by - 12;
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, hy, 14.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-9.5*f, hy + 2, 4, 0, Math.PI*2); ctx.fill();                       // telinga (belakang)
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, hy, 12.8, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-9.5*f, hy + 2, 2.7, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = skinD; ctx.beginPath(); ctx.arc(0, hy + 1, 12.8, .15*Math.PI, .85*Math.PI); ctx.lineTo(0, hy); ctx.closePath(); ctx.globalAlpha *= .35; ctx.fill(); ctx.globalAlpha = pl.dead > 0 ? Math.max(0, pl.dead/1.2) : 1;
   const HAT = worn.hat ? WEAR[worn.hat] : null;
-  const blink = (now % 3200) < 120;
-  ctx.fillStyle = OL;
-  for (const ex of [3, 8]){
-    if (blink) ctx.fillRect(ex*f - 1.5, hy + 1, 3, 1.2);
-    else { ctx.beginPath(); ctx.ellipse(ex*f, hy + 1, 1.7, 2.6, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.fillRect(ex*f - .6, hy - .6, 1, 1); ctx.fillStyle = OL; }
+  const hair = '#5a3624', hairL = '#8a5a3a';
+  {
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, hy - 1.5, 14.5, Math.PI*1.0, Math.PI*2.0); ctx.lineTo(14.5, hy - 1); ctx.lineTo(-14.5, hy - 1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(0, hy - 1.5, 13, Math.PI*1.0, Math.PI*2.0); ctx.closePath(); ctx.fill();
+    // poni: 3 jumput menghadap depan
+    ctx.beginPath(); ctx.moveTo(-13*f, hy - 2);
+    for (const [px_, py_] of [[-8, 3], [-4, -1], [1, 4], [5, 0], [9, 3], [13, -2]]) ctx.lineTo(px_*f, hy + py_ - 1);
+    ctx.lineTo(13*f, hy - 8); ctx.lineTo(-13*f, hy - 8); ctx.closePath(); ctx.fill();
+    ctx.fillRect(f > 0 ? -14 : 10, hy - 4, 4, 8);                                                  // rambut belakang
+    ctx.fillStyle = hairL; ctx.beginPath(); ctx.ellipse(-4*f, hy - 9, 5, 1.8, -.25*f, 0, Math.PI*2); ctx.fill();
   }
-  ctx.strokeStyle = OL; ctx.lineWidth = 1.4; ctx.beginPath();
-  if (pl.swing > 0 || pl.hurt > 0) ctx.arc(6*f, hy + 7, 2, 0, Math.PI*2); else ctx.arc(6*f, hy + 5.5, 2.6, .15*Math.PI, .85*Math.PI);
-  ctx.stroke();
-  if (HAT){ ctx.save(); ctx.translate(0, hy - 7); drawHat(ctx, HAT, f); ctx.restore(); }
+  // mata: putih + pupil besar + kilau, alis
+  const blink = (now % 3200) < 120;
+  for (const ex of [2.5, 8.5]){
+    const cx = ex*f, cy = hy + 1.5;
+    if (blink){ ctx.fillStyle = OL; ctx.fillRect(cx - 2, cy, 4, 1.4); continue; }
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(cx, cy, 2.8, 3.6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(cx, cy, 2, 2.8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1d2a44'; ctx.beginPath(); ctx.ellipse(cx + .7*f, cy + .4, 1.4, 2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(cx + .2*f - .5, cy - 1, 1, 1);
+  }
+  { ctx.fillStyle = hair; ctx.fillRect(1*f - (f < 0 ? 3.2 : 0), hy - 3.5, 3.2, 1.3); ctx.fillRect(7*f - (f < 0 ? 3.2 : 0), hy - 3.5, 3.2, 1.3); }
+  ctx.fillStyle = 'rgba(255,120,120,.35)'; ctx.beginPath(); ctx.ellipse(11*f, hy + 5.5, 2, 1.2, 0, 0, Math.PI*2); ctx.fill();   // pipi
+  ctx.strokeStyle = OL; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; ctx.beginPath();
+  if (pl.swing > 0 || pl.hurt > 0) ctx.arc(6*f, hy + 7.5, 1.8, 0, Math.PI*2); else ctx.arc(6*f, hy + 5.5, 2.4, .15*Math.PI, .85*Math.PI);
+  ctx.stroke(); ctx.lineCap = 'butt';
+  if (HAT){ ctx.save(); ctx.translate(0, hy - ({cowboy: 6, crown: 8, beanie: 3}[HAT.style] ?? 4)); drawHat(ctx, HAT, f); ctx.restore(); }
 
   let a = idle;
   if (pl.swing > 0){
     const t = 1 - pl.swing/.2, target = pl.swingAng - Math.PI/2, wind = target - 1.4*f;
     const k = t < .35 ? t/.35 : 1 - (t-.35)/.65*.5;
-    // sudut lengan dihitung di ruang yang diskalakan; koreksi supaya tetap mengarah ke kursor
     a = wind + (target - wind)*k;
   }
   arm(a, true);
   const s = HELD_OVERRIDE || selected();
   if (s && s.key === FIST && toolDef()){
-    ctx.save(); ctx.translate(f*4, shY); ctx.rotate(a); ctx.translate(0, 13); ctx.scale(f, 1);
+    ctx.save(); ctx.translate(f*8.5, shY); ctx.rotate(a); ctx.translate(0, 12); ctx.scale(f, 1);
     drawPickaxe(ctx, 0, -4, .8, toolDef()); ctx.restore();
   }
   if (s && s.key !== FIST && pl.swing === 0){
     const d = itemDef(s.key);
-    ctx.save(); ctx.translate(f*4, shY); ctx.rotate(a); ctx.translate(0, 13);
+    ctx.save(); ctx.translate(f*8.5, shY); ctx.rotate(a); ctx.translate(0, 12);
     if (d.kind === 'seed') drawSeed(ctx, 0, 0, .8, BY_ID[d.id].color);
     else if (d.kind === 'wrench') drawWrench(ctx, 0, 0, .7);
-    else { ctx.fillStyle = OL; ctx.fillRect(-5, -5, 10, 10); ctx.imageSmoothingEnabled = false; ctx.drawImage(TEX[d.id], -4, -4, 8, 8); }
+    else if (d.kind === 'block'){ ctx.fillStyle = OL; ctx.fillRect(-5, -5, 10, 10); ctx.imageSmoothingEnabled = false; ctx.drawImage(TEX[d.id], -4, -4, 8, 8); }
     ctx.restore();
   }
   ctx.restore();
@@ -477,9 +595,9 @@ function draw(alpha){
     const same = (ax,ay)=> tileAt(ax,ay) === id;
     const l = same(x-1,y)?0:2, r = same(x+1,y)?0:2, t = same(x,y-1)?0:2, b = same(x,y+1)?0:2;
     if (BY_ID[id].platform){ ctx.drawImage(texAt(id, x, y), sx, sy, TS, TS); continue; }
-    ctx.drawImage(texAt(id, x, y), 0, 0, 16, 16, sx + l, sy + t, TS - l - r, TS - t - b);
+    { const tx0 = texAt(id, x, y); ctx.drawImage(tx0, 0, 0, tx0.width, tx0.height, sx + l, sy + t, TS - l - r, TS - t - b); }
     const above = tileAt(x,y-1), openTop = !above || !BY_ID[above].solid;
-    if (id === 1 && openTop) ctx.drawImage(GRASSV[tileHash(x,y)], sx + l, sy + 2, TS - l - r, TS*.5);
+    if (id === 1 && openTop){ const gv = GRASSV[tileHash(x,y)]; ctx.drawImage(gv, sx + l, sy + 2, TS - l - r, gv.width >= 32 ? TS - 2 : TS*.5); }
     if (id === 15){                                        // lava padat, permukaan berdenyut
       const a = .18 + .14*Math.sin(now/260 + x*1.7 + y);
       ctx.fillStyle = 'rgba(255,230,120,' + a + ')'; ctx.fillRect(sx + l, sy + t, TS - l - r, TS - t - b);
