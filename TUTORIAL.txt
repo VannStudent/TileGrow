@@ -7,6 +7,7 @@ TILEGROW v1.4 - CARA PAKAI
 ISI ZIP
 
   start-server.bat              -> menjalankan server (untuk main bareng satu WiFi)
+  Main-Online.bat               -> server + ngrok: teman bisa main dari WiFi/kuota berbeda (gratis)
 
   Panel-Role.bat                -> membuka Panel Role (set Developer/Moderator)
 
@@ -161,3 +162,21 @@ F. YANG BARU DI v1.4
       Pembeli: pakai kunci inggris pada mesin -> pilih jumlah -> Beli. Gems masuk ke kas mesin.
       Pemilik ambil gems lewat tombol "Ambil gems". Mesin hanya bisa dipecah kalau stok & kas kosong.
       Mode online: semua transaksi dihitung server (tidak bisa dicurangi dari browser).
+
+
+G. MAIN JARAK JAUH (BEDA WIFI) + APK ANDROID  - GRATIS
+  Di PC kamu (yang jadi server):
+    1. Klik dua kali Main-Online.bat. Akan terbuka 2 jendela: "TileGrow Server" dan ngrok.
+    2. Biarkan dua-duanya terbuka selama main. PC harus nyala & tersambung internet.
+  Teman (HP Android):
+    1. Install TileGrow-v1.4.apk (izinkan "Instal dari sumber tidak dikenal" kalau diminta).
+    2. Buka aplikasinya -> Main Online -> alamat sudah terisi -> Sambung -> daftar/login.
+  Teman (PC/laptop): buka https://squeegee-fifth-obliged.ngrok-free.dev di browser.
+    ngrok gratis menampilkan halaman peringatan dulu: klik "Visit Site".
+  Catatan:
+    - Ngrok paket gratis: 1 alamat tetap, ada kuota bulanan. Tidak ada biaya.
+    - Panel Role TIDAK bisa dibuka lewat alamat ngrok (sengaja); bukanya hanya dari PC server.
+    - Kalau alamat ngrok berubah: ganti android/src/id/tilegrow/app/Config.java dan
+      alamat di Main-Online.bat, lalu build ulang: bash android/build-apk.sh
+    - Kunci tanda tangan APK ada di C:\Users\<kamu>\.tilegrow\ . JANGAN dihapus/dibagikan:
+      tanpa kunci yang sama, update APK tidak bisa dipasang menimpa versi lama.

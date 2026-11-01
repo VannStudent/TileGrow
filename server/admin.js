@@ -18,7 +18,8 @@ function createAdmin({social, port}){
   // return true kalau request ini milik panel admin (sudah dijawab)
   function handle(req, res, p){
     if (p !== '/admin' && !p.startsWith('/admin/')) return false;
-    if (!isLoopback(req) || !hostOk(req)){ send(res, 404, 'text/plain', 'Not found'); return true; }
+    // lewat tunnel (ngrok) koneksi juga dari 127.0.0.1, tapi membawa X-Forwarded-For: tolak, panel hanya untuk PC ini
+    if (!isLoopback(req) || !hostOk(req) || req.headers['x-forwarded-for'] || req.headers['x-forwarded-host']){ send(res, 404, 'text/plain', 'Not found'); return true; }
     if (p === '/admin' && req.method === 'GET'){ send(res, 200, 'text/html; charset=utf-8', page(TOKEN)); return true; }
     if (req.headers['x-tilegrow-admin'] !== TOKEN){ json(res, 403, {err: 'Token salah. Muat ulang halaman admin.'}); return true; }
     if (p === '/admin/api/accounts' && req.method === 'GET'){ json(res, 200, {accounts: social.listAccounts()}); return true; }

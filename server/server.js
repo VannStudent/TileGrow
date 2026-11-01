@@ -173,13 +173,21 @@ function wsControl(op, payload){ const p = payload || Buffer.alloc(0); return Bu
 
 const clients = new Set();
 let nextId = 1;
+// IP asli pemain. Lewat tunnel (ngrok) semua koneksi datang dari 127.0.0.1, jadi pakai X-Forwarded-For,
+// tapi HANYA kalau koneksinya memang dari PC ini (tunnel). Dari luar, header itu bisa dipalsukan, jadi diabaikan.
+function clientIp(req, sock){
+  const raw = String(sock.remoteAddress || '').replace(/^::ffff:/, '');
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim().replace(/^::ffff:/, '');
+  if ((raw === '127.0.0.1' || raw === '::1') && fwd && /^[0-9a-f.:]{3,45}$/i.test(fwd)) return fwd;
+  return raw;
+}
 class Client {
-  constructor(sock){
+  constructor(sock, ip){
     this.sock = sock; this.buf = Buffer.alloc(0); this.frag = [];
     this.id = nextId++; this.user = null; this.flag = 'ID'; this.world = null; this.state = null;
     this.rate = {t: Date.now(), n: 0}; this.alive = true; this.authBusy = false;
     this.noclip = false; this.fullzoom = false; this.invis = false; this.frozen = false; this.lastPos = null;
-    this.ip = String(sock.remoteAddress || '').replace(/^::ffff:/, '');
+    this.ip = ip || String(sock.remoteAddress || '').replace(/^::ffff:/, '');
     sock.on('data', d => this.onData(d));
     sock.on('close', () => this.onClose());
     sock.on('error', () => {});
@@ -807,7 +815,7 @@ server.on('upgrade', (req, sock) => {
   const accept = crypto.createHash('sha1').update(key + GUID).digest('base64');
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   sock.setNoDelay(true);
-  clients.add(new Client(sock));
+  clients.add(new Client(sock, clientIp(req, sock)));
 });
 // ping tiap 20 dtk supaya koneksi mati terdeteksi
 setInterval(()=>{ for (const c of clients) try { c.sock.write(wsControl(9)); } catch(e){} }, 20000);

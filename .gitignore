@@ -1,4 +1,7 @@
 dist/
 server/data/
 .rollback/
-.agent/
+.agent/
+android/build/
+*.jks
+*.jks.pass
