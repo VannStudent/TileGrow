@@ -341,8 +341,9 @@ function inReachS(c, tx, ty){
 }
 
 // ---------- batas percobaan login (anti tebak password) ----------
-// 5 gagal dalam 60 dtk (per IP atau per username) = diblokir 60 dtk. Akun baru maks 5 per IP per jam.
-const FAIL_MAX = 5, FAIL_WINDOW = 60000, FAIL_BLOCK = 60000, REG_MAX = 5, REG_WINDOW = 3600000;
+// 5 gagal dalam 60 dtk (per IP atau per username) = diblokir 60 dtk. Akun baru maks 35 per IP per jam
+// (banyak pemain bisa berbagi satu IP: satu WiFi, atau kuota HP yang IP-nya dipakai bersama).
+const FAIL_MAX = 5, FAIL_WINDOW = 60000, FAIL_BLOCK = 60000, REG_MAX = 35, REG_WINDOW = 3600000;
 const fails = new Map(), regs = new Map();
 function blockedFor(key){ const f = fails.get(key); return f && f.until > Date.now() ? Math.ceil((f.until - Date.now()) / 1000) : 0; }
 function noteFail(key){
