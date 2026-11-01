@@ -43,13 +43,44 @@ function bindTouch(){
   hold('tJump', ()=> keys.KeyW = true, ()=> keys.KeyW = false);
   // tombol pakai: pakai item dipegang di tile depan pemain (sama seperti tombol E untuk tinju)
   hold('tAct', ()=>{ touch.act = true; touchAction(); }, ()=> touch.act = false);
-  // ketuk langsung di world = aksi di tile itu
+  // ketuk langsung di world = aksi di tile itu; jari ditahan (dengan tinju) = pukul terus, geser jari = pindah tile.
+  // dua jari di world = cubit untuk zoom (aksi berhenti sampai semua jari diangkat).
+  const at = t => { const r = cv.getBoundingClientRect(); mouse.x = (t.clientX - r.left) * (VW / r.width); mouse.y = (t.clientY - r.top) * (VH / r.height); };
+  const pts = new Map();                         // jari yang sedang menyentuh world
+  const dist = () => { const [p, q] = [...pts.values()]; return Math.hypot(p.x - q.x, p.y - q.y) || 1; };
+  touch.cvId = null; touch.pinch = null;
   cv.addEventListener('touchstart', e => {
     if (controlMode !== 'touch') return;
-    const t = e.changedTouches[0], r = cv.getBoundingClientRect();
-    mouse.x = (t.clientX - r.left) * (VW / r.width); mouse.y = (t.clientY - r.top) * (VH / r.height);
-    mouse.btn = 0; actCool = 0; act(); e.preventDefault();
+    e.preventDefault();
+    for (const t of e.changedTouches) pts.set(t.identifier, {x: t.clientX, y: t.clientY});
+    if (pts.size >= 2){                          // mulai cubit: hentikan pukul
+      touch.cvId = null; mouse.down = false;
+      if (!touch.pinch) touch.pinch = {d0: dist(), z0: zoom};
+      return;
+    }
+    if (touch.pinch || touch.cvId !== null) return;
+    const t = e.changedTouches[0]; touch.cvId = t.identifier; at(t);
+    mouse.btn = 0; mouse.down = true; actCool = 0; act();
   }, {passive:false});
+  cv.addEventListener('touchmove', e => {
+    if (controlMode !== 'touch') return;
+    e.preventDefault();
+    for (const t of e.changedTouches){ if (pts.has(t.identifier)) pts.set(t.identifier, {x: t.clientX, y: t.clientY}); if (t.identifier === touch.cvId) at(t); }
+    if (touch.pinch && pts.size >= 2){
+      const z = touch.pinch.z0 * dist() / touch.pinch.d0;
+      setZoom(z < ZOOM_MIN && online() && net.staff.zoom ? staffZoomMin() : z);
+    }
+  }, {passive:false});
+  const end = e => {
+    for (const t of e.changedTouches){ pts.delete(t.identifier); if (t.identifier === touch.cvId){ touch.cvId = null; mouse.down = false; } }
+    if (pts.size < 2 && touch.pinch && pts.size === 0) touch.pinch = null;
+    if (pts.size === 0){ touch.cvId = null; mouse.down = false; }
+  };
+  cv.addEventListener('touchend', end); cv.addEventListener('touchcancel', end);
+}
+// dipanggil tiap langkah game: tombol pakai ditahan dengan tinju = pukul terus (sama seperti tahan E)
+function touchHoldStep(){
+  if (touch.act && controlMode === 'touch' && actCool === 0 && !anyUIOpen() && itemDef(selected().key).kind === 'fist') punchFront();
 }
 function touchAction(){
   const s = selected(), d = itemDef(s.key);

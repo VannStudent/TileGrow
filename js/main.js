@@ -19,7 +19,7 @@ addEventListener('keydown', e=>{
   if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', e=> keys[e.code] = false);
-addEventListener('blur', ()=>{ for (const k in keys) keys[k] = false; mouse.down = false; });
+addEventListener('blur', ()=>{ for (const k in keys) keys[k] = false; mouse.down = false; touch.act = false; touch.cvId = null; });
 
 cv.addEventListener('contextmenu', e=> e.preventDefault());
 cv.addEventListener('mousemove', e=>{
@@ -76,6 +76,7 @@ function frame(now){
       if (mouse.btn === 2 || s.key === FIST) act();   // tahan = pukul terus
     }
     if (keys.KeyE && actCool === 0 && !anyUIOpen()) punchFront();   // tahan E = pukul 2 block depan
+    touchHoldStep();                                                // HP: tahan tombol pakai = pukul terus
     updateWorld();
     acc -= DT;
   }

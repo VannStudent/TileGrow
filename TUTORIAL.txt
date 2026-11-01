@@ -179,3 +179,9 @@ G. MAIN JARAK JAUH (BEDA WIFI) + APK ANDROID  - GRATIS
       baris NGROK_URL di start-server.bat, lalu build ulang: bash android/build-apk.sh
     - Kunci tanda tangan APK ada di C:\Users\<kamu>\.tilegrow\ . JANGAN dihapus/dibagikan:
       tanpa kunci yang sama, update APK tidak bisa dipasang menimpa versi lama.
+
+
+H. KONTROL HP (LAYAR SENTUH)
+  - Tahan tombol pakai (tangan) dengan Tinju = pukul terus block di depan.
+  - Tahan jari di block (pegang Tinju) = pukul terus; geser jari untuk pindah block.
+  - Cubit dua jari di layar game = zoom in / zoom out (125%-250%). Bisa juga lewat Menu > Zoom.
