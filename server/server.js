@@ -15,9 +15,10 @@ const os = require('os');
 const readline = require('readline');
 const {loadEcon} = require('./econ');
 const {createSocial, RANK} = require('./social');
+const {createNews} = require('./news');
 
 const PORT = +process.env.PORT || 8080;
-const VERSION = 'v1.4';
+const VERSION = 'v1.6';
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = path.resolve(__dirname, '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
@@ -228,6 +229,35 @@ class Client {
 
 function inWorld(name){ return [...clients].filter(c => c.world === name); }
 function broadcast(world, obj, except){ const f = wsFrame(JSON.stringify(obj)); for (const c of clients) if (c.world === world && c !== except && c.alive) try { c.sock.write(f); } catch(e){} }
+// v1.6: /broadcast pesan — ke SEMUA pemain online di semua world, bayar gems.
+// Harga 1000, naik +1000 untuk setiap broadcast lain dalam 10 menit terakhir (maks 5000). Jeda 2 menit per pemain, maks 120 huruf.
+const fmt = n => Number(n).toLocaleString('id-ID');
+const BC = {base: 1000, step: 1000, max: 5000, window: 10 * 60e3, cooldown: 2 * 60e3, maxLen: 120};
+const bcLog = [];                                       // waktu broadcast (semua pemain)
+function bcPrice(now){ while (bcLog.length && now - bcLog[0] > BC.window) bcLog.shift(); return Math.min(BC.max, BC.base + BC.step * bcLog.length); }
+function broadcastCmd(c, text){
+  const parts = text.slice(1).trim().split(/\s+/), cmd = (parts.shift() || '').toLowerCase();
+  if (cmd !== 'broadcast' && cmd !== 'bc') return false;
+  const me = accounts[c.user.toLowerCase()]; if (!me) return true;
+  const note = t => { c.send({t: 'note', text: t}); return true; };
+  const now = Date.now(), price = bcPrice(now);
+  const body = parts.join(' ').replace(/[\u0000-\u001f]/g, '').trim();
+  if (!body) return note('Pakai: /broadcast pesan (maks ' + BC.maxLen + ' huruf). Harga sekarang: ' + fmt(price) + ' gems. Tampil ke semua pemain online di semua world.');
+  if (body.length > BC.maxLen) return note('Broadcast maksimal ' + BC.maxLen + ' huruf (pesanmu ' + body.length + ').');
+  const mu = social.muteInfo(me); if (mu) return note('Kamu di-mute, tidak bisa broadcast.');
+  const wait = Math.ceil(((c.lastBc || me.lastBc || 0) + BC.cooldown - now) / 1000);
+  if (wait > 0) return note('Tunggu ' + wait + ' detik lagi sebelum broadcast berikutnya.');
+  if (social.inTrade(c.user)) return note('Selesaikan trade dulu.');
+  const E = econOf(c.user);
+  if (E.gems < price) return note('Gems tidak cukup. Broadcast sekarang ' + fmt(price) + ' gems (kamu punya ' + fmt(E.gems) + ').');
+  E.gems -= price; saveEcon(c.user);
+  bcLog.push(now); c.lastBc = me.lastBc = now;
+  const msg = {t: 'bcast', name: c.user, display: social.display(c.user), role: social.roleOf(c.user), world: c.world || '', text: body};
+  for (const o of clients) if (o.user) o.send(msg);
+  console.log('[broadcast]', c.user, '(' + price + ' gems):', body);
+  pushEcon(c, [['act', 'Broadcast terkirim ke semua pemain (-' + fmt(price) + ' gems). Harga berikutnya: ' + fmt(bcPrice(now)) + ' gems.']]);
+  return true;
+}
 // v1.5: pesan pribadi /msg NAMA pesan, /r pesan (balas), /ignore NAMA (toggle), /ignore (daftar)
 function privateMsg(c, text){
   const parts = text.slice(1).trim().split(/\s+/), cmd = (parts.shift() || '').toLowerCase();
@@ -439,6 +469,7 @@ async function handleAuth(c, m, t){
   c.send({t: 'auth', ok: true, user: a.name, flag: a.flag, role: social.roleOf(a.name), display: social.display(a.name),
           player: f.client || null, econ: {bag: E.bag, bagSlots: E.bagSlots, gems: E.gems, prog: E.prog}, isNew: t === 'register'});
   c.send({t: 'friends', ...social.friendList(a.name)});
+  c.send({t: 'news', ...news.get(), canEdit: social.rankOf(a.name) >= RANK.dev});
   for (const fr of social.friendList(a.name).friends){ const fc = findOnline(fr.name); if (fc) social.pushFriends(fr.name); }
 }
 
@@ -682,6 +713,8 @@ const social = createSocial({
   teleport(c, world, st){ const w = worlds.get(world) || loadWorld(world); if (!w) return; if (c.world !== world) enterWorld(c, w); c.lastPos = null; c.send({t: 'tp', x: st ? st.x : null, y: st ? st.y : null}); },
   shutdown: () => shutdown()
 });
+// v1.6: Kabar TileGrow (file server/news.txt di folder data; diedit dengan Notepad atau dari game oleh Developer)
+const news = createNews({file: path.join(DATA, 'news.txt'), onChange: () => { const n = news.get(); for (const o of clients) if (o.user) o.send({t: 'news', ...n, canEdit: social.rankOf(o.user) >= RANK.dev}); }});
 const admin = require('./admin.js').createAdmin({social, port: PORT});
 
 // ---------- pesan ----------
@@ -767,6 +800,15 @@ function handle(c, m){
       if (err){ econ.out.length = 0; return c.send({t: 'note', text: err}); }
       saveEcon(c.user); return pushEcon(c);
     }
+    case 'newsGet': return c.send({t: 'news', ...news.get(), canEdit: social.rankOf(c.user) >= RANK.dev, open: true});
+    case 'newsSet': {
+      // v1.6: hanya Developer/Owner yang boleh mengubah Kabar TileGrow
+      if (social.rankOf(c.user) < RANK.dev) return c.send({t: 'note', text: 'Hanya Developer yang bisa mengedit berita.'});
+      const t = String(m.text || '');
+      if (t.length > news.MAX) return c.send({t: 'note', text: 'Berita terlalu panjang (maks ' + news.MAX + ' huruf).'});
+      news.set(t); social.staffLog(c.user, 'news', null, {len: t.length});
+      return c.send({t: 'note', text: 'Berita disimpan & dikirim ke semua pemain.'});
+    }
     case 'lockConvert': {
       // v1.4: 100 World Lock <-> 1 Crystal Lock
       if (social.inTrade(c.user)) return c.send({t: 'note', text: 'Selesaikan trade dulu.'});
@@ -790,11 +832,13 @@ function handle(c, m){
     }
     case 'chat': {
       if (!c.world) return;
-      const text = String(m.text || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 120);
+      // v1.6: command boleh lebih panjang (/broadcast 120 huruf + nama command); chat biasa tetap 120
+      const raw = String(m.text || '').replace(/[\u0000-\u001f]/g, '').trim(), text = raw.slice(0, raw[0] === '/' ? 160 : 120);
       if (!text) return;
       if (text[0] === '/'){
         if (TEST && /^\/testgive /.test(text)){ const [, k, n] = text.split(' '); econ.run(econOf(c.user), g => k === 'gem' ? g.addGems(+n) : g.addItem(k, +n)); return pushEcon(c); }
         if (privateMsg(c, text)) return;
+        if (broadcastCmd(c, text)) return;
         if (social.command(c, text)) return;
         return c.send({t: 'note', text: 'Perintah tidak dikenal: ' + text.split(' ')[0]});
       }

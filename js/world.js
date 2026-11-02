@@ -17,7 +17,7 @@ let worlds = {};          // nama world -> snapshot {fg,bgw,trees,meta,spawn}
 let worldName = 'START';  // world yang sedang dibuka
 const chat = [];          // riwayat chat & notifikasi
 const GUEST_NAME = 'Tamu';
-const settings = {sound:true, shake:true, showGrid:false, showNames:true, treeLabels:true};
+const settings = {sound:true, music:true, shake:true, showGrid:false, showNames:true, treeLabels:true};
 const dmg = new Map();
 
 function idx(x,y){ return y*COLS + x; }
@@ -210,7 +210,7 @@ function say(kind, text){
   renderChat();
 }
 function playerSay(text){
-  const t = String(text||'').trim().slice(0,120); if (!t) return;
+  const t0 = String(text||'').trim(), t = t0.slice(0, t0[0] === '/' ? 160 : 120); if (!t) return;
   if (t[0] === '/' && !(online() && !['/help', '/worlds', '/who', '/warp', '/world'].includes(t.split(' ')[0].toLowerCase()))) return chatCommand(t);
   if (online()){
     // command (/...) diproses server; command staff hanya jalan untuk Moderator/Developer
@@ -229,8 +229,9 @@ function chatCommand(line){
   if (c === 'warp' || c === 'world'){ if (!arg) return say('sys','Pakai: /warp NAMA'); return gotoWorld(arg); }
   if (c === 'worlds') return online() ? say('sys', 'World di server: ' + net.worldList.map(w => w.name).join(', ')) : say('sys', 'World kamu: ' + worldList().join(', '));
   if (c === 'who' && online()) return say('sys', 'Di world ini: ' + [who(), ...[...net.players.values()].map(r => r.name)].join(', '));
-  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, ' + (online() ? '/who, /msg NAMA pesan, /r pesan, /ignore NAMA, ' : '') + '/help' + (online() && net.role !== 'player' ? ' · staff: /staffhelp' : ''));
+  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, ' + (online() ? '/who, /msg NAMA pesan, /r pesan, /ignore NAMA, /broadcast pesan, ' : '') + '/help' + (online() && net.role !== 'player' ? ' · staff: /staffhelp' : ''));
   if (['msg', 'pm', 'r', 'ignore', 'unignore'].includes(c)) return say('sys', 'Pesan pribadi hanya bisa saat main online.');
+  if (c === 'broadcast' || c === 'bc') return say('sys', 'Broadcast hanya bisa saat main online.');
   say('sys', 'Perintah tidak dikenal: /' + c);
 }
 function setPlayerName(n){

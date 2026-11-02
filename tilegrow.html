@@ -265,6 +265,48 @@
   @media (max-width:520px){ .wlTitle{font-size:21px} .wlGo{padding:0 14px;font-size:14px} .wlSearch input{font-size:16px;padding:12px 8px} .wlWorlds{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))} }
   /* layar judul / akun / lobby */
   #stage.menuMode .tl, #stage.menuMode #fps, #stage.menuMode .rstack, #stage.menuMode .inv, #stage.menuMode .chatbox, #stage.menuMode #touchUI{display:none}
+  /* ===== v1.6 layar judul ala sandbox klasik: langit, awan kotak, gunung ungu, tombol tembus pandang ===== */
+  .titleScr{background:none;backdrop-filter:none;flex-direction:column}
+  #titleSky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+  .tMenu{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:-4vh}
+  .tLogo canvas{width:min(440px,84vw);height:auto;image-rendering:pixelated;filter:drop-shadow(0 4px 0 rgba(0,0,0,.18))}
+  .tBtn{width:230px;padding:9px 26px;font-size:24px;font-weight:900;color:#fff;letter-spacing:.3px;cursor:pointer;
+    background:rgba(120,205,240,.62);border:none;border-radius:4px;-webkit-text-stroke:4px #1b2440;paint-order:stroke fill;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);transition:background .1s,transform .08s}
+  .tBtn:hover,.tBtn:focus-visible{background:rgba(180,236,255,.8);outline:none}
+  .tBtn:active{transform:scale(.96)}
+  .tVer{position:absolute;right:12px;bottom:8px;color:#fff;font-weight:900;font-size:15px;-webkit-text-stroke:3px #1b2440;paint-order:stroke fill}
+  .tMusic{position:absolute;left:12px;bottom:10px;width:40px;height:40px;border-radius:50%;border:none;background:rgba(150,220,245,.55);color:#fff;font-size:20px;font-weight:900;cursor:pointer;-webkit-text-stroke:2px #1b2440;paint-order:stroke fill}
+  .tMusic.off{opacity:.45;text-decoration:line-through}
+  @media (max-height:420px){ .tMenu{gap:6px;margin-top:0} .tBtn{font-size:18px;padding:5px 20px;min-width:170px} .tLogo canvas{width:min(300px,60vw)} }
+  /* ===== v1.6 Kabar TileGrow ===== */
+  .nwWin .hidden, .bcBanner.hidden, .nwFoot .hidden{display:none !important}
+  .newsBox{background:rgba(6,10,20,.45)}
+  .nwWin{width:min(640px,94vw);max-height:86vh;display:flex;flex-direction:column;background:rgb(32,120,150);border-top:3px solid #0d2a36;border-bottom:3px solid #0d2a36;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  .nwHead{display:flex;align-items:center;gap:10px;padding:10px 14px 4px;font-size:26px;font-weight:900;color:#fff;-webkit-text-stroke:3px #0d2a36;paint-order:stroke fill}
+  .nwHead canvas{image-rendering:pixelated;width:28px;height:28px}
+  .nwX{margin-left:auto;background:none;border:none;color:#fff;font-size:22px;font-weight:900;cursor:pointer;-webkit-text-stroke:2px #0d2a36;paint-order:stroke fill}
+  .nwBody{overflow:auto;padding:4px 18px 10px;color:#fbefc8;font-size:15px;font-weight:700;line-height:1.45;text-shadow:0 2px 0 rgba(0,0,0,.35)}
+  .nwBody h3{margin:8px 0 4px;color:#fff;font-size:22px;font-weight:900;-webkit-text-stroke:3px #0d2a36;paint-order:stroke fill}
+  .nwBody h4{margin:10px 0 2px;color:#ff6b5e;font-size:17px;font-weight:900}
+  .nwBody p{margin:4px 0}
+  .nwBody ul{margin:4px 0;padding-left:22px}
+  .nwBody b{color:#fff}
+  .nwY{color:#ffe36a}.nwP{color:#c9b8ff}
+  .nwWarn{display:flex;gap:6px;align-items:flex-start}.nwWarn b{color:#ff6b5e}
+  .nwSign{flex:none;width:16px;height:16px;margin-top:2px;background:linear-gradient(#c08a50 0 60%,transparent 60%),linear-gradient(90deg,transparent 40%,#6a4520 40% 60%,transparent 60%);border:2px solid #17121c;border-radius:2px}
+  .nwFoot{display:flex;gap:8px;justify-content:flex-end;padding:8px 14px 12px}
+  .nwEditor{padding:4px 18px;overflow:auto}
+  .nwEditor textarea{width:100%;min-height:150px;box-sizing:border-box;font:13px/1.4 ui-monospace,Consolas,monospace;background:#0d2a36;color:#e8f6ff;border:2px solid #17121c;border-radius:6px;padding:8px}
+  .nwHelp{margin:0 0 6px;color:#d8f3ff;font-size:12px}.nwCount{color:#bfe6f5;font-size:11px;text-align:right}
+  .nwPrevLbl{color:#d8f3ff;font-size:12px;margin-top:6px}.nwPrev{background:rgba(0,0,0,.15);border-radius:6px;max-height:200px}
+  .wlNews{margin-right:8px;padding:5px 10px;border-radius:8px;border:2px solid #17121c;background:#2f88a8;color:#fff;font-weight:800;cursor:pointer}
+  /* ===== v1.6 /broadcast ===== */
+  .bcBanner{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);z-index:35;max-width:min(560px,70vw);padding:8px 16px;border-radius:8px;
+    background:linear-gradient(180deg,#ffcf3d,#f29b1f);border:3px solid #17121c;color:#2a1606;font-weight:800;font-size:14px;box-shadow:0 5px 0 rgba(0,0,0,.35);pointer-events:none}
+  .bcBanner b{color:#7a1e00;margin-right:4px}
+  .bcBanner.show{animation:bcIn .35s ease-out}
+  @keyframes bcIn{from{transform:translate(-50%,30px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
   .screen{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,10,20,.6);backdrop-filter:blur(3px)}
   .screen.hidden{display:none}
   .sbox{width:min(420px,92vw);padding:22px;display:flex;flex-direction:column;gap:10px}
@@ -578,7 +620,7 @@
       <button class="ctab tog" id="chatToggle" title="Kecilkan / besarkan"></button>
     </div>
     <div id="chatlog"></div>
-    <form id="chatForm"><input id="chatIn" maxlength="120" placeholder="Enter / T untuk chat · /help"></form>
+    <form id="chatForm"><input id="chatIn" maxlength="160" placeholder="Enter / T untuk chat · /help"></form>
   </div>
   <div class="toast card" id="toast"></div>
 
@@ -611,6 +653,7 @@
       </div>
       <label style="margin-top:14px">Pengaturan</label>
       <div class="opt"><span>Suara</span><input type="checkbox" id="optSound"></div>
+      <div class="opt"><span>Musik di menu</span><input type="checkbox" id="optMusic"></div>
       <div class="opt"><span>Getar layar</span><input type="checkbox" id="optShake"></div>
       <div class="opt"><span>Tampilkan grid</span><input type="checkbox" id="optGrid"></div>
       <div class="opt"><span>Tampilkan nama</span><input type="checkbox" id="optNames"></div>
@@ -702,13 +745,37 @@
     <div class="scroll" id="dlgBody"></div>
     <div class="info" style="justify-content:flex-end"><button class="btn x">Batal</button><button class="btn primary" id="dlgSave">Simpan</button></div>
   </div></div>
-  <!-- layar judul -->
-  <div class="screen" id="scr-title"><div class="sbox card">
-    <div class="logo">TileGrow<small>sandbox 2D · bangun, tanam, splice · v1.5</small></div>
-    <button class="btn primary big" id="tOnline">🌐 Main Online (WiFi/LAN)</button>
-    <button class="btn big" id="tPlay">Main Offline</button>
-    <button class="btn big" id="tOptions">Opsi</button>
+  <!-- v1.6: Kabar TileGrow (berita/event dari Developer) -->
+  <div class="modal hidden newsBox" id="newsBox" style="z-index:40"><div class="nwWin">
+    <div class="nwHead"><canvas id="nwIcon" width="28" height="28"></canvas><span>Kabar TileGrow</span><button class="nwX" id="nwClose" type="button" aria-label="Tutup">✕</button></div>
+    <div class="nwBody" id="nwBody"></div>
+    <div class="nwEditor hidden" id="nwEditor">
+      <p class="nwHelp"><b># Judul</b> · <b>## Tanggal/Subjudul</b> (merah) · <b>! Peringatan</b> · <b>- poin</b> · <b>*tebal*</b> · <b>{kuning}</b> · <b>[ungu]</b></p>
+      <textarea id="nwText" maxlength="6000" spellcheck="false"></textarea>
+      <div class="nwCount" id="nwCount"></div>
+      <div class="nwPrevLbl">Pratinjau:</div><div class="nwBody nwPrev" id="nwPrev"></div>
+    </div>
+    <div class="nwFoot"><button class="btn hidden" id="nwEdit" type="button">✏️ Edit Berita</button><button class="btn primary hidden" id="nwSave" type="button">Simpan &amp; Kirim</button><button class="btn" type="button" onclick="document.getElementById('newsBox').classList.add('hidden')">Tutup</button></div>
   </div></div>
+  <div class="bcBanner hidden" id="bcBanner"></div>
+  <div class="modal hidden" id="aboutBox" style="z-index:40"><div class="win card" style="width:min(420px,92vw)">
+    <h2>Tentang TileGrow</h2>
+    <p class="note" style="font-size:13px;line-height:1.5">TileGrow adalah game sandbox 2D buatan sendiri: bangun, tanam pohon, splice seed, kunci world, dan main bareng teman.<br>Terinspirasi game sandbox seperti Growtopia, tapi semua gambar, suara, dan kode dibuat sendiri.</p>
+    <div class="info" style="justify-content:flex-end"><button class="btn primary" type="button" onclick="document.getElementById('aboutBox').classList.add('hidden')">Oke</button></div>
+  </div></div>
+  <!-- layar judul -->
+  <div class="screen titleScr" id="scr-title">
+    <canvas id="titleSky" aria-hidden="true"></canvas>
+    <div class="tMenu">
+      <div class="tLogo" aria-label="TileGrow"><canvas id="titleLogo" width="440" height="160"></canvas></div>
+      <button class="tBtn" id="tOnline">Main Online</button>
+      <button class="tBtn" id="tPlay">Main Offline</button>
+      <button class="tBtn" id="tOptions">Opsi</button>
+      <button class="tBtn" id="tAbout">Tentang</button>
+    </div>
+    <div class="tVer">v1.6</div>
+    <button class="tMusic" id="tMusic" title="Musik">♪</button>
+  </div>
 
   <!-- server online -->
   <div class="screen hidden" id="scr-server"><form class="sbox card" id="svForm" autocomplete="off">
@@ -748,7 +815,7 @@
   <div class="screen hidden lobbyScr" id="scr-lobby"><div class="wlobby">
     <div class="wlTop">
       <div class="wlBrand"><span class="wlLogo">TileGrow</span><span class="wlTitle">Pilih World</span></div>
-      <div class="wlAcct"><span id="lbFlag"></span><b id="lbUser"></b><i class="wlDot" id="lbDot"></i><button class="wlLogout" id="lbBack" type="button">Logout</button></div>
+      <div class="wlAcct"><button class="wlNews" id="lbNews" type="button">📰 Kabar</button><span id="lbFlag"></span><b id="lbUser"></b><i class="wlDot" id="lbDot"></i><button class="wlLogout" id="lbBack" type="button">Logout</button></div>
     </div>
     <div class="wlMsg" id="lbMsg"></div>
     <form id="lbForm" class="wlSearch" autocomplete="off">
@@ -788,6 +855,7 @@
 <script src="js/world.js"></script>
 <script src="js/game.js"></script>
 <script src="js/render.js"></script>
+<script src="js/pixchar.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/screens.js"></script>
 <script src="js/controls.js"></script>
@@ -799,6 +867,8 @@
   document.getElementById('gemIcon').src = icon('gem');
   document.getElementById('shopGemIcon').src = icon('gem');
 </script>
+<script src="js/newsui.js"></script>
+<script src="js/title.js"></script>
 <script src="js/main.js"></script>
 <script>
   // Kalau file game (folder js/) tidak ikut terbaca, jangan tampilkan UI mati: beri tahu caranya.

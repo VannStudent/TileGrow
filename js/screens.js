@@ -91,6 +91,9 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('hidden', s.id !== 'scr-' + id));
   document.getElementById('stage').classList.toggle('menuMode', id !== 'game');
   if (id === 'lobby') renderLobby();
+  // v1.6: musik santai hanya di layar menu (judul, login, lobby); berhenti saat masuk world
+  if (id === 'game') musicStop(); else { if (typeof musicStart === 'function') musicStart(); }
+  if (id === 'title' && typeof titleStart === 'function') titleStart();
   if (id === 'login' || id === 'register'){ const on = online();
     document.querySelectorAll('.modeNote').forEach(e => e.textContent = on ? 'Online di server ' + net.addr + '. Akun disimpan di server ini (password di-hash).' : 'Mode offline: akun disimpan di browser perangkat ini. Password tidak disimpan, hanya hash-nya.'); }
   if (id === 'login'){ $('lgErr').textContent = ''; renderFlagPicker('lgFlags'); setTimeout(()=> $('lgUser').focus(), 30); }

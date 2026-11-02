@@ -215,9 +215,9 @@ function bindInvDrag(){
 
 // ---------- chat ----------
 // konsol ala Growtopia (di atas layar): tab SEMUA / CHAT / SISTEM / AKTIVITAS, tiap baris ada jam
-const CHAT_COL = {sys:'#9fd0ff', me:'#ffffff', pick:'#7be37a', level:'#ffd25e', quest:'#ffb3e0', act:'#c9b8ff', staff:'#ff9a2e', pm:'#ffe36a', pmto:'#d9c46a'};
-const CHAT_TAG = {sys:'[S]', me:'', pick:'', level:'', quest:'', act:'', staff:'[STAFF]', pm:'[PM]', pmto:'[PM]'};
-const CHAT_GROUP = {me:'chat', sys:'sys', level:'sys', quest:'sys', pick:'act', act:'act', staff:'sys', pm:'chat', pmto:'chat'};
+const CHAT_COL = {sys:'#9fd0ff', me:'#ffffff', pick:'#7be37a', level:'#ffd25e', quest:'#ffb3e0', act:'#c9b8ff', staff:'#ff9a2e', pm:'#ffe36a', pmto:'#d9c46a', bc:'#ffb43d'};
+const CHAT_TAG = {sys:'[S]', me:'', pick:'', level:'', quest:'', act:'', staff:'[STAFF]', pm:'[PM]', pmto:'[PM]', bc:'[BROADCAST]'};
+const CHAT_GROUP = {me:'chat', sys:'sys', level:'sys', quest:'sys', pick:'act', act:'act', staff:'sys', pm:'chat', pmto:'chat', bc:'chat'};
 let chatFilter = 'all';
 function hhmmss(t){ const d = new Date(t); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(v => String(v).padStart(2,'0')).join(':'); }
 function renderChat(){
@@ -547,7 +547,7 @@ function esc(s){ return String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<
 function renderMenu(){
   $('mGuest').style.display = online() ? 'none' : '';
   $('wRename').style.display = online() ? 'none' : '';
-  $('optSound').checked = settings.sound; $('optShake').checked = settings.shake;
+  $('optSound').checked = settings.sound; $('optShake').checked = settings.shake; $('optMusic').checked = settings.music !== false;
   $('optGrid').checked = settings.showGrid; $('optNames').checked = settings.showNames; $('optTree').checked = settings.treeLabels !== false;
   $('optZoom').min = ZOOM_MIN; $('optZoom').max = ZOOM_MAX; $('optZoom').value = zoom; $('optZoomV').textContent = Math.round(zoom*100) + '%';
 }
@@ -592,6 +592,7 @@ function bindUI(){
   $('mGuest').onclick = ()=>{ guest = !guest; $('mGuest').textContent = guest ? 'Main sebagai Kamu' : 'Main sebagai Tamu (tes lock)'; closeModals(); toast(guest ? 'Mode tamu: kamu tidak punya akses ke area yang dikunci.' : 'Kembali sebagai pemilik.'); refreshUI(); };
   $('mNew').onclick = ()=>{ if (confirm('Buat dunia baru? Dunia, tas, gems, dan level sekarang akan hilang.')){ genWorld(); rollQuests(); respawn(); save(); closeModals(); toast('Dunia baru dibuat.'); refreshUI(); } };
   $('optSound').onchange = e=> settings.sound = e.target.checked;
+  $('optMusic').onchange = e=>{ settings.music = e.target.checked; if (settings.music && !inGame) musicStart(); else musicStop(); if ($('tMusic')) $('tMusic').classList.toggle('off', !settings.music); };
   $('optShake').onchange = e=> settings.shake = e.target.checked;
   $('optGrid').onchange = e=> settings.showGrid = e.target.checked;
   $('optNames').onchange = e=> settings.showNames = e.target.checked;

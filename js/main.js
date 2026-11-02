@@ -89,7 +89,7 @@ function frame(now){
 }
 
 function boot(){
-  bindUI(); bindScreens(); bindControlPicker(); bindTouch(); bindSocial();
+  bindUI(); bindScreens(); bindControlPicker(); bindTouch(); bindSocial(); bindNews(); bindTitle(); musicArm();
   genWorld();                 // world latar untuk layar judul (bukan save siapa pun)
   rollQuests();
   const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom || ZOOM_MIN)); zoom = 0; setZoom(z);

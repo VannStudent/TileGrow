@@ -196,13 +196,7 @@ function icon(key){
   if (d.kind === 'fist') drawFist(g,16,16,1.6);
   else if (d.kind === 'wrench') drawWrench(g,16,17,1.3);
   else if (d.kind === 'gem') drawGem(g,16,16,1.6);
-  else if (d.kind === 'wear'){
-    if (d.slot === 'wings') drawWingIcon(g, 16, 17, d.wear);
-    else if (d.slot === 'hat'){ g.save(); g.translate(16, 24); g.scale(1.15, 1.15); drawHat(g, d.wear, 1); g.restore(); }
-    else if (d.slot === 'shirt') drawShirtIcon(g, d.wear);
-    else if (d.slot === 'tool') drawPickaxe(g, 16, 17, 1.2, d.wear);
-    else drawPantsIcon(g, d.wear);
-  }
+  else if (d.kind === 'wear'){ g.imageSmoothingEnabled = false; g.drawImage(pxWearIcon(d), 0, 0); }   // v1.6: ikon pakaian pixel art
   else if (d.kind === 'seed') drawSeed(g,16,16,2,BY_ID[d.id].color);
   else drawBlockIcon(g,5,5,22,d.id);
   return ICON[key] = c.toDataURL();
@@ -276,132 +270,41 @@ const PS = 0.58;
 const ACCESS_GREEN = '#b8ffb0';
 function drawPlayer(rx, ry){
   const now = Date.now(), f = pl.face, x = rx + pl.w/2, ground = ry + pl.h;
-  if (pl.dead > 0){
-    ctx.globalAlpha = Math.max(0, pl.dead/1.2);
-  }
+  if (pl.dead > 0) ctx.globalAlpha = Math.max(0, pl.dead/1.2);
   const walking = pl.onGround && Math.abs(pl.vx) > 20, ph = pl.step;
   let sqx = 1, sqy = 1;
   if (pl.land > 0){ const k = pl.land/.14; sqx = 1 + .18*k; sqy = 1 - .16*k; }
   else if (!pl.onGround){ const v = Math.min(1, Math.abs(pl.vy)/650); sqx = 1 - .08*v; sqy = 1 + .1*v; }
-  const bob = walking ? Math.abs(Math.sin(ph))*2 : Math.sin(now/420)*.6;
   const hurtFlash = pl.hurt > 0 && ((now/60|0) % 2 === 0);
-
-  ctx.save();
-  ctx.translate(x, ground); ctx.scale(sqx*PS, sqy*PS);
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, 13, 3.5, 0, 0, Math.PI*2); ctx.fill();
-
-  // ---- v3: badan chibi ala Growtopia — kepala besar, badan kotak lebar, lengan berlengan baju, sepatu jelas ----
-  let la = 0, lb = 0;
-  if (walking){ la = Math.sin(ph)*5; lb = -la; }
-  else if (!pl.onGround){ la = pl.vy < 0 ? -3 : 2; lb = pl.vy < 0 ? 3 : -2; }
-  const air = pl.onGround ? 0 : 2;
-  const P = worn.pants ? WEAR[worn.pants].color : ['#3d4f86','#2a3866','#5a6fb0'];
-  const SW = worn.shirt ? WEAR[worn.shirt] : null;
-  const shirt = hurtFlash ? '#ffffff' : SW ? SW.color[0] : '#e8584a', shirtD = SW ? SW.color[1] : '#a83428', shirtL = SW ? SW.color[2] : '#ff8a78';
-  const skin = hurtFlash ? '#ffd8c8' : '#f6c7a0', skinD = '#d9986e';
-  const rr = (x, y, w, h, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
-  // kaki + sepatu (sepatu lebih lebar dari kaki, ujung menghadap arah jalan)
-  const leg = (dx, sw)=>{
-    const lx = dx + sw*.45;
-    rr(lx - 4.5, -15 - bob*.2, 9, 14 - air, 3, OL);
-    rr(lx - 3, -14 - bob*.2, 6, 11 - air, 2, P[0]);
-    ctx.fillStyle = shadeHex(P[0], -24); ctx.fillRect(lx + 1, -14 - bob*.2, 2, 11 - air);
-    const sx0 = lx - 5 + (f > 0 ? 1 : -2);
-    rr(sx0 - 1, -5 - air, 13, 6, 3, OL);
-    rr(sx0, -4 - air, 11, 4, 2, '#2b1f1b');
-    ctx.fillStyle = '#6a4c40'; ctx.fillRect(sx0 + 1, -4 - air, 8, 1.2);
-  };
-  if (wingsDef()){
-    const W = wingsDef();
-    const flapUp = pl.flap > 0 ? Math.sin((1 - pl.flap/.3) * Math.PI) * 10 : (!pl.onGround ? Math.sin(now/90)*4 : Math.sin(now/600)*1.5);
-    const wy = W.key === 'w_devil' ? -25 : -24;          // pangkal sayap di punggung atas, bukan di kepala
-    drawWing(ctx, -3*f, wy - bob, .92, -f, flapUp, W);
-    drawWing(ctx,  3*f, wy - 1 - bob, .92,  f, flapUp*.8, W);
-  }
-  leg(-3.5*f, -la*f); leg(3.5*f, -lb*f);
-
-  // badan: kotak membulat lebar, bayangan sisi, kerah
-  const by = -27 - bob;
-  rr(-10, by - 1, 20, 16, 5, OL);
-  rr(-8.5, by, 17, 13.5, 4, shirt);
-  ctx.save(); ctx.beginPath(); ctx.roundRect(-8.5, by, 17, 13.5, 4); ctx.clip();
-  ctx.fillStyle = shirtD; ctx.fillRect(f > 0 ? 4 : -8.5, by, 4.5, 14);          // sisi gelap (belakang)
-  ctx.fillStyle = shirtL; ctx.fillRect(f > 0 ? -8.5 : 5.5, by, 3, 14);          // sisi terang (depan)
-  ctx.fillStyle = shadeHex(P[0], 0); ctx.fillRect(-9, by + 11, 18, 3);           // pinggang celana
-  ctx.fillStyle = '#2a2018'; ctx.fillRect(-9, by + 10.6, 18, 1.2);               // ikat pinggang
-  if (SW && !hurtFlash) shirtDetail(ctx, SW, -8.5, by, 17, 11);
-  ctx.restore();
-  ctx.fillStyle = skinD; ctx.beginPath(); ctx.ellipse(0, by + .5, 4, 1.6, 0, 0, Math.PI*2); ctx.fill();   // leher
-
-  // lengan: lengan baju + tangan bulat
-  const shY = by + 3;
-  const arm = (ang, front)=>{
-    ctx.save(); ctx.translate(f*(front ? 8.5 : -7.5), shY); ctx.rotate(ang);
-    rr(-3.6, -2.5, 7.2, 14, 3.5, OL);
-    rr(-2.3, -1.5, 4.6, 7.5, 2, front ? shirt : shirtD);                     // lengan baju
-    rr(-2.3, 5, 4.6, 4.5, 2, front ? skin : skinD);                           // lengan bawah
-    ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, 11, 4.4, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = front ? skin : skinD; ctx.beginPath(); ctx.arc(0, 11, 3.2, 0, Math.PI*2); ctx.fill();
-    if (front){ ctx.fillStyle = '#ffe2c8'; ctx.beginPath(); ctx.arc(-1, 10, 1.1, 0, Math.PI*2); ctx.fill(); }
-    ctx.restore();
-  };
-  const idle = walking ? Math.sin(ph)*.6 : (pl.onGround ? -.28*f + Math.sin(now/500)*.05 : -.9*f);
-  arm(-idle, false);
-
-  // kepala: bulat besar, telinga, rambut bervolume dengan poni
-  const hy = by - 12;
-  ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, hy, 14.5, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(-9.5*f, hy + 2, 4, 0, Math.PI*2); ctx.fill();                       // telinga (belakang)
-  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, hy, 12.8, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(-9.5*f, hy + 2, 2.7, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = skinD; ctx.beginPath(); ctx.arc(0, hy + 1, 12.8, .15*Math.PI, .85*Math.PI); ctx.lineTo(0, hy); ctx.closePath(); ctx.globalAlpha *= .35; ctx.fill(); ctx.globalAlpha = pl.dead > 0 ? Math.max(0, pl.dead/1.2) : 1;
-  const HAT = worn.hat ? WEAR[worn.hat] : null;
-  const hair = '#5a3624', hairL = '#8a5a3a';
-  {
-    ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(0, hy - 1.5, 14.5, Math.PI*1.0, Math.PI*2.0); ctx.lineTo(14.5, hy - 1); ctx.lineTo(-14.5, hy - 1); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(0, hy - 1.5, 13, Math.PI*1.0, Math.PI*2.0); ctx.closePath(); ctx.fill();
-    // poni: 3 jumput menghadap depan
-    ctx.beginPath(); ctx.moveTo(-13*f, hy - 2);
-    for (const [px_, py_] of [[-8, 3], [-4, -1], [1, 4], [5, 0], [9, 3], [13, -2]]) ctx.lineTo(px_*f, hy + py_ - 1);
-    ctx.lineTo(13*f, hy - 8); ctx.lineTo(-13*f, hy - 8); ctx.closePath(); ctx.fill();
-    ctx.fillRect(f > 0 ? -14 : 10, hy - 4, 4, 8);                                                  // rambut belakang
-    ctx.fillStyle = hairL; ctx.beginPath(); ctx.ellipse(-4*f, hy - 9, 5, 1.8, -.25*f, 0, Math.PI*2); ctx.fill();
-  }
-  // mata: putih + pupil besar + kilau, alis
-  const blink = (now % 3200) < 120;
-  for (const ex of [2.5, 8.5]){
-    const cx = ex*f, cy = hy + 1.5;
-    if (blink){ ctx.fillStyle = OL; ctx.fillRect(cx - 2, cy, 4, 1.4); continue; }
-    ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(cx, cy, 2.8, 3.6, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(cx, cy, 2, 2.8, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#1d2a44'; ctx.beginPath(); ctx.ellipse(cx + .7*f, cy + .4, 1.4, 2, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(cx + .2*f - .5, cy - 1, 1, 1);
-  }
-  { ctx.fillStyle = hair; ctx.fillRect(1*f - (f < 0 ? 3.2 : 0), hy - 3.5, 3.2, 1.3); ctx.fillRect(7*f - (f < 0 ? 3.2 : 0), hy - 3.5, 3.2, 1.3); }
-  ctx.fillStyle = 'rgba(255,120,120,.35)'; ctx.beginPath(); ctx.ellipse(11*f, hy + 5.5, 2, 1.2, 0, 0, Math.PI*2); ctx.fill();   // pipi
-  ctx.strokeStyle = OL; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; ctx.beginPath();
-  if (pl.swing > 0 || pl.hurt > 0) ctx.arc(6*f, hy + 7.5, 1.8, 0, Math.PI*2); else ctx.arc(6*f, hy + 5.5, 2.4, .15*Math.PI, .85*Math.PI);
-  ctx.stroke(); ctx.lineCap = 'butt';
-  if (HAT){ ctx.save(); ctx.translate(0, hy - ({cowboy: 6, crown: 8, beanie: 3}[HAT.style] ?? 4)); drawHat(ctx, HAT, f); ctx.restore(); }
-
+  // v1.6: karakter pixel art (js/pixchar.js). Ayunan lengan dihitung di sini lalu dikirim ke painter.
+  const idle = walking ? Math.sin(ph)*.5 : (pl.onGround ? -.1*0 + Math.sin(now/560)*.08 : -.8);
   let a = idle;
   if (pl.swing > 0){
-    const t = 1 - pl.swing/.2, target = pl.swingAng - Math.PI/2, wind = target - 1.4*f;
+    const t = 1 - pl.swing/.2, target = (pl.swingAng - Math.PI/2) * f, wind = target - 1.4;
     const k = t < .35 ? t/.35 : 1 - (t-.35)/.65*.5;
     a = wind + (target - wind)*k;
   }
-  arm(a, true);
   const s = HELD_OVERRIDE || selected();
-  if (s && s.key === FIST && toolDef()){
-    ctx.save(); ctx.translate(f*8.5, shY); ctx.rotate(a); ctx.translate(0, 12); ctx.scale(f, 1);
-    drawPickaxe(ctx, 0, -4, .8, toolDef()); ctx.restore();
-  }
+  const holdTool = !!(s && s.key === FIST && toolDef());
+  const o = {
+    walk: walking, phase: walking ? Math.sin(ph) > 0 : false, air: !pl.onGround,
+    bob: walking ? (Math.abs(Math.sin(ph)) > .6 ? 1 : 0) : (Math.sin(now/420) > .4 ? 1 : 0),
+    aBack: -idle, aFront: a, wings: wingsDef(), hat: worn.hat ? WEAR[worn.hat] : null,
+    shirt: worn.shirt ? WEAR[worn.shirt] : null, pants: worn.pants ? WEAR[worn.pants] : null,
+    tool: holdTool ? toolDef() : null, flash: hurtFlash,
+    flap: pl.flap > 0 ? Math.sin((1 - pl.flap/.3) * Math.PI) : (!pl.onGround ? (Math.sin(now/110) + 1)/2 : (Math.sin(now/700) + 1)/4),
+    blink: (now % 3200) < 120, mouth: pl.swing > 0 || pl.hurt > 0
+  };
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, ground - 1, 9, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  const hand = drawPixelChar(ctx, x, ground, f, o, sqx, sqy);
+  // item yang dipegang di kepalan tangan depan
   if (s && s.key !== FIST && pl.swing === 0){
-    const d = itemDef(s.key);
-    ctx.save(); ctx.translate(f*8.5, shY); ctx.rotate(a); ctx.translate(0, 12);
-    if (d.kind === 'seed') drawSeed(ctx, 0, 0, .8, BY_ID[d.id].color);
-    else if (d.kind === 'wrench') drawWrench(ctx, 0, 0, .7);
-    else if (d.kind === 'block'){ ctx.fillStyle = OL; ctx.fillRect(-5, -5, 10, 10); ctx.imageSmoothingEnabled = false; ctx.drawImage(TEX[d.id], -4, -4, 8, 8); }
+    const d = itemDef(s.key), U = hand.U;
+    ctx.save(); ctx.translate(hand.x, hand.y); ctx.scale(U*f, U); ctx.imageSmoothingEnabled = false;
+    if (d.kind === 'seed') drawSeed(ctx, 0, 0, .55, BY_ID[d.id].color);
+    else if (d.kind === 'wrench') drawWrench(ctx, 0, 0, .5);
+    else if (d.kind === 'block'){ ctx.fillStyle = OL; ctx.fillRect(-5, -5, 10, 10); ctx.drawImage(TEX[d.id], -4, -4, 8, 8); }
     ctx.restore();
   }
   ctx.restore();
@@ -413,8 +316,10 @@ function drawPlayer(rx, ry){
     ctx.fillStyle = g2; ctx.fillRect(cx - 50, ground - 66, 100, 100);
     ctx.strokeStyle = 'rgba(255,226,120,' + k + ')'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.ellipse(cx, hy2 - 8 + Math.sin(now/180)*1.5, 9, 3, 0, 0, Math.PI*2); ctx.stroke();
-    const AW = {key:'angel', color:['#ffffff','#c9d4ea','#ffffff']}, up = Math.sin(now/110)*8;
-    ctx.globalAlpha = k; drawWing(ctx, x - 3, ground - 26*PS - 4, .62, -1, up, AW); drawWing(ctx, x + 3, ground - 26*PS - 4, .62, 1, up, AW); ctx.globalAlpha = 1;
+    const AW = {key: 'w_angel', color: ['#ffffff', '#c9d4ea', '#ffffff']};
+    ctx.globalAlpha = k;
+    drawPixelChar(ctx, x, ground, pl.face, {wings: AW, flap: (Math.sin(now/110) + 1)/2, bob: 0, blink: true, ghost: 1, hideBody: 1});
+    ctx.globalAlpha = 1;
     if (Math.random() < .5) parts.push({x: cx + (Math.random()-.5)*30, y: ground - 10, vx:(Math.random()-.5)*20, vy:-30 - Math.random()*40, life:.7, c:'#fff6c8', s:2, g:-.05});
   }
 

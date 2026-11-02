@@ -204,4 +204,34 @@ ok('/ignore lagi = membuka blokir, pesan sampai lagi', pmIn && pmIn.text === 'se
 drain(q1); for (let k = 0; k < 8; k++) S(q1, {t: 'chat', text: '/msg pmdua spam' + k}); await sleep(400);
 nn = await wait(q1, 'note', 600, m => /Terlalu cepat/.test(m.text));
 ok('/msg dibatasi (anti-spam)', !!nn);
+// ---------- v1.6: /broadcast ----------
+const [b1] = await reg('bcsatu'); const [b2] = await reg('bcdua');
+S(b1, {t: 'join', name: 'BCA', world}); await wait(b1, 'world'); S(b2, {t: 'join', name: 'BCB', world}); await wait(b2, 'world');
+drain(b1); S(b1, {t: 'chat', text: '/broadcast halo semua'}); nn = await wait(b1, 'note', 700);
+ok('/broadcast ditolak kalau gems kurang', nn && /Gems tidak cukup/.test(nn.text) && /1\.000/.test(nn.text), nn && nn.text);
+S(b1, {t: 'chat', text: '/testgive gem 9000'}); await lastEcon(b1);
+drain(b1); drain(b2); drain(dev);
+S(b1, {t: 'chat', text: '/broadcast jual World Lock murah di BCA'});
+let bc2 = await wait(b2, 'bcast', 900), bcD = await wait(dev, 'bcast', 900), eB = await lastEcon(b1);
+ok('/broadcast sampai ke pemain di world lain', bc2 && bc2.name === 'bcsatu' && bc2.text === 'jual World Lock murah di BCA' && bc2.world === 'BCA', JSON.stringify(bc2));
+ok('/broadcast sampai ke semua pemain online', !!bcD);
+ok('/broadcast memotong 1000 gems', eB && eB.gems === 8050, eB && eB.gems);
+drain(b1); S(b1, {t: 'chat', text: '/broadcast lagi'}); nn = await wait(b1, 'note', 700);
+ok('/broadcast ada jeda per pemain', nn && /Tunggu \d+ detik/.test(nn.text), nn && nn.text);
+S(b2, {t: 'chat', text: '/testgive gem 9000'}); await lastEcon(b2);
+drain(b2); S(b2, {t: 'chat', text: '/broadcast'}); nn = await wait(b2, 'note', 700);
+ok('/broadcast tanpa pesan menampilkan harga sekarang (naik jadi 2.000)', nn && /2\.000/.test(nn.text), nn && nn.text);
+drain(b2); S(b2, {t: 'chat', text: '/broadcast pesan kedua'}); eB = await lastEcon(b2);
+ok('Harga broadcast naik +1000 bila ada broadcast lain dalam 10 menit', eB && eB.gems === 7050, eB && eB.gems);
+drain(b2); S(b2, {t: 'chat', text: '/broadcast ' + 'x'.repeat(130)}); nn = await wait(b2, 'note', 700);
+ok('/broadcast maks 120 huruf', nn && /120/.test(nn.text), nn && nn.text);
+
+// ---------- v1.6: Kabar TileGrow (berita) ----------
+drain(p1); S(p1, {t: 'newsGet'}); let nw = await wait(p1, 'news', 700);
+ok('Berita bisa diminta pemain', nw && typeof nw.text === 'string' && nw.text.length > 0 && nw.canEdit === false);
+drain(p1); S(p1, {t: 'newsSet', text: '# hack'}); nn = await wait(p1, 'note', 700);
+ok('Pemain biasa tidak bisa mengedit berita', nn && /Hanya Developer/.test(nn.text));
+drain(p1); drain(dev); S(dev, {t: 'newsSet', text: '# Event Panen\n## 3 Nov: Panen Raya\nDrop {gems} x2 di world [START].\n! Jangan scam.'});
+nw = await wait(p1, 'news', 4000);
+ok('Developer mengedit berita -> terkirim ke semua pemain', nw && /Panen Raya/.test(nw.text), JSON.stringify(nw));
 console.log(`\n${pass} lulus, ${fail} gagal`); process.exit(fail ? 1 : 0);
