@@ -179,6 +179,20 @@ function makeTex32(id, v){
       }
       t3px(g, 0, 0, t3sh(base, 40), 32, 1); t3px(g, 0, 31, '#3e2a18', 32, 1);
       break; }
+    case 24: {  // house entrance: kusen kayu, daun pintu terbuka setengah (terlihat ke dalam), anak tangga batu
+      t3px(g, 0, 0, '#3e2510', 32, 32);
+      t3slab(g, 1, 0, 30, 32, '#a8703a', null, 0);
+      t3px(g, 6, 3, '#5a3412', 20, 26);                                     // kusen dalam
+      t3px(g, 7, 4, '#120a06', 18, 25);                                     // ruang gelap di dalam rumah
+      g.fillStyle = 'rgba(255,214,130,.22)'; g.fillRect(8, 5, 6, 24);          // cahaya lampu dari dalam
+      // daun pintu terbuka ke dalam (sisi kanan, tampak menyerong)
+      t3px(g, 17, 4, '#2a1808', 8, 25); t3px(g, 18, 5, '#c4843f', 6, 23);
+      t3px(g, 18, 5, '#e0a861', 1, 23); t3px(g, 23, 5, '#8a5222', 1, 23);
+      t3px(g, 19, 8, '#8a5222', 4, 7); t3px(g, 19, 17, '#8a5222', 4, 8);    // panel pintu
+      t3px(g, 19, 15, '#ffd23d', 2, 2);                                      // gagang
+      t3px(g, 5, 0, '#c99a5a', 22, 3); t3px(g, 5, 0, '#e8c088', 22, 1);      // ambang atas
+      t3px(g, 3, 29, '#7d8697', 26, 3); t3px(g, 3, 29, '#b9c3d2', 26, 1);    // anak tangga batu
+      t3edge(g, '#2a1808'); break; }
     default: return null;
   }
   return c;

@@ -215,9 +215,9 @@ function bindInvDrag(){
 
 // ---------- chat ----------
 // konsol ala Growtopia (di atas layar): tab SEMUA / CHAT / SISTEM / AKTIVITAS, tiap baris ada jam
-const CHAT_COL = {sys:'#9fd0ff', me:'#ffffff', pick:'#7be37a', level:'#ffd25e', quest:'#ffb3e0', act:'#c9b8ff', staff:'#ff9a2e'};
-const CHAT_TAG = {sys:'[S]', me:'', pick:'', level:'', quest:'', act:'', staff:'[STAFF]'};
-const CHAT_GROUP = {me:'chat', sys:'sys', level:'sys', quest:'sys', pick:'act', act:'act', staff:'sys'};
+const CHAT_COL = {sys:'#9fd0ff', me:'#ffffff', pick:'#7be37a', level:'#ffd25e', quest:'#ffb3e0', act:'#c9b8ff', staff:'#ff9a2e', pm:'#ffe36a', pmto:'#d9c46a'};
+const CHAT_TAG = {sys:'[S]', me:'', pick:'', level:'', quest:'', act:'', staff:'[STAFF]', pm:'[PM]', pmto:'[PM]'};
+const CHAT_GROUP = {me:'chat', sys:'sys', level:'sys', quest:'sys', pick:'act', act:'act', staff:'sys', pm:'chat', pmto:'chat'};
 let chatFilter = 'all';
 function hhmmss(t){ const d = new Date(t); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(v => String(v).padStart(2,'0')).join(':'); }
 function renderChat(){
@@ -263,7 +263,7 @@ function shopItemsOf(cat){
   return SHOP.filter(it => {
     if (cat === 'paket') return ['starter','builder','farmer','bag8'].includes(it.key);
     if (cat === 'lock') return ['b30','b31','b32','b33',WRENCH].includes(it.key);
-    if (cat === 'khusus') return ['b20','b21','b22','b40','b41','b42','b62'].includes(it.key);
+    if (cat === 'khusus') return ['b20','b21','b22','b24','b40','b41','b42','b62'].includes(it.key);
     if (cat === 'wear') return it.tab === 'wear';
     if (cat === 'farm') return it.tab === 'farm';
     if (cat === 'fun') return it.tab === 'fun';

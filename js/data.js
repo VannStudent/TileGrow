@@ -17,7 +17,7 @@ const PAL = {
   16:['#e8cf86','#9a7c3a','#fff4c2'],  17:['#6a4f33','#3a2a18','#9a7a52'],
   18:['#dce8f5','#92a3b8','#ffffff'],  20:['#a8763f','#5e3f18','#e8d7b4'],
   21:['#c08a4a','#6e4518','#ecc07a'],  22:['#343c4e','#161a22','#5a6680'],
-  23:['#8a5a2b','#3e2510','#c08a50'],  30:['#ffd74a','#8a6b14','#fff8c0'],
+  23:['#8a5a2b','#3e2510','#c08a50'],  24:['#c9a227','#5a3c12','#ffe27a'],  30:['#ffd74a','#8a6b14','#fff8c0'],
   31:['#7fd8f5','#2d6c8a','#e0f8ff'],  32:['#c2a05a','#7a5a20','#ffe9a0'],
   33:['#d87ae8','#7a2d8a','#ffd8f8'],  40:['#4e3f31','#281f16','#6b5847'],
   41:['#b57a3c','#6e4316','#e0a861'],  42:['#8893a6','#515a69','#b9c3d2'],
@@ -52,6 +52,8 @@ const T = {
   DOOR:   {id:21, name:'Pintu',        hits:4,  xp:2,  price:20, deco:1, wrench:'door'},
   DISPLAY:{id:22, name:'Kotak Pajang', hits:4,  xp:2,  price:25, wrench:'display'},
   MAINDOOR:{id:23,name:'Pintu Utama',  hits:0,  deco:1},
+  // v1.5: House Entrance — hanya bisa dilewati yang punya akses lock di tile itu; lainnya tertahan seperti tembok
+  ENTRANCE:{id:24,name:'House Entrance', hits:4, xp:2,  price:50, deco:1, entrance:1},
   WLOCK:  {id:30, name:'World Lock',   hits:0,  xp:0,  price:1800, wrench:'lock', lock:'world'},
   CLOCK:  {id:34, name:'Crystal Lock', hits:0,  xp:0,  wrench:'lock', lock:'world', worth:100},
   SLOCK:  {id:31, name:'Small Lock',   hits:0,  xp:0,  price:40,  wrench:'lock', lock:'small'},
@@ -179,6 +181,7 @@ const SHOP = [
   {key:'b20', name:'Papan Tulis', desc:'Tulis teks di world', price:15, give:[['b20',1]]},
   {key:'b21', name:'Pintu',       desc:'Bisa diberi nama & dikunci', price:20, give:[['b21',1]]},
   {key:'b22', name:'Kotak Pajang',desc:'Pajang satu item', price:25, give:[['b22',1]]},
+  {key:'b24', name:'House Entrance', desc:'Gerbang rumah: hanya pemilik & yang punya akses lock bisa lewat, lainnya tertahan. Pasang di area yang di-lock', price:50, give:[['b24',1]]},
   {key:'b40', name:'Dinding Gua x25', desc:'Dinding belakang, bisa dipecah', price:20, give:[['b40',25]]},
   {key:'b41', name:'Platform Kayu x25', desc:'Bisa dilewati dari bawah, dipijak dari atas', price:125, give:[['b41',25]]},
   {key:'b42', name:'Platform Batu x25', desc:'Platform dari batu', price:150, give:[['b42',25]]},
@@ -353,6 +356,11 @@ function makeTex(id, v){
       px(g,4,3,shadeHex(P[0],-18),8,5); px(g,4,9,shadeHex(P[0],-18),8,5);
       px(g,4,3,shadeHex(P[0],20),8,1); px(g,4,9,shadeHex(P[0],20),8,1);
       px(g,11,8,'#ffd23d',2,2); px(g,11,8,'#fff8c8',1,1);
+      break; }
+    case 24: {   // house entrance: kusen kayu, tirai bergaris, lengkung atas
+      px(g,0,0,P[1],16,16); px(g,1,1,'#8a5a2b',14,15); px(g,2,2,'#2a1a10',12,14);
+      for (let x=3;x<13;x+=2) px(g,x,4,x%4===1?P[0]:'#e8e0c8',2,11);
+      px(g,2,2,P[0],12,2); px(g,2,2,P[2],12,1); px(g,7,0,P[2],2,2);
       break; }
     case 22: {   // kotak pajang
       px(g,0,0,P[1],16,16); px(g,1,1,P[0],14,14); px(g,3,3,'#141824',10,10);

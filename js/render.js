@@ -604,6 +604,13 @@ function draw(alpha){
       for (let k=0;k<2;k++){ const bx = sx + 6 + ((now/40 + x*13 + k*11) % (TS-12)), by = sy + 8 + ((now/70 + y*7 + k*9) % (TS-14));
         ctx.fillStyle = '#fff2a0'; ctx.fillRect(bx, by, 2, 2); }
     }
+    if (id === 24 && !canBuild(x, y)){                      // tanda: kamu tidak bisa lewat (gembok kecil di tengah pintu)
+      const cx = sx + TS - 7, cy = sy + 7;                // lencana gembok kecil di pojok kanan atas
+      ctx.fillStyle = '#1a1208'; ctx.fillRect(cx - 4, cy - 1, 8, 7);
+      ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy - 1, 2.6, Math.PI, 0); ctx.stroke();
+      ctx.strokeStyle = '#d8dde6'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy - 1, 2.6, Math.PI, 0); ctx.stroke();
+      ctx.fillStyle = '#ffd23d'; ctx.fillRect(cx - 3, cy, 6, 5);
+    }
     if (id === 21){ const m = meta.get(i); if (m && m.door && m.door.locked){ ctx.fillStyle = '#f0d24a'; ctx.fillRect(sx+TS/2-3, sy+TS/2-2, 6, 6); } }
     if (id === 22){ const m = meta.get(i); if (m && m.display && m.display.key){
       const d = itemDef(m.display.key);

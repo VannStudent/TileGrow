@@ -197,6 +197,7 @@ function netOnMessage(m){
     case 'dropSet': { const it = items.find(it => it.sid === m.id); if (it) it.n = m.n; return; }
     case 'note': if (m.once){ net.notes = net.notes || new Set(); if (net.notes.has(m.once)) return; net.notes.add(m.once); } toast(m.text); say('sys', m.text); return;
     case 'staff': say('staff', m.text); return;
+    case 'pm': say(m.dir === 'to' ? 'pmto' : 'pm', (m.dir === 'to' ? 'ke ' : 'dari ') + (m.display || m.name) + ': ' + m.text); if (m.dir === 'from') sfx('pick'); return;
     case 'role': net.role = m.role; net.display = m.display; toast('Role kamu sekarang: ' + ({mod:'Moderator', dev:'Developer', owner:'Owner'}[m.role] || 'Player')); refreshUI(); return;
     case 'staffFx': return applyStaffFx(m);
     case 'frozen': net.frozen = m.on; toast(m.on ? 'Kamu dibekukan oleh ' + m.by + '.' : 'Kamu bisa bergerak lagi.'); return;

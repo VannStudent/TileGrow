@@ -157,4 +157,51 @@ drain(p1); for (let k = 0; k < 7; k++){ S(p1, {t: 'act', a: 'hit', i: VI}); awai
 op = await wait(p1, 'ops', 900, m => !m.denied && m.ops && m.ops.some(o => o[0] === VI && o[1] === 0));
 const vd = await wait(p1, 'dropAdd', 900, m => m.d.key === 'b62');
 ok('Mesin kosong bisa dipecah pemilik & mesinnya jatuh sebagai drop', !!op && !!vd);
+// ---------- v1.5: House Entrance ----------
+// world V14 dikunci 'pemain' (Crystal Lock). 'pemain' memasang entrance di (53,29); 'devi' (tanpa akses) tidak bisa masuk
+S(dev, {t: 'join', name: 'V14', world}); await wait(dev, 'world'); S(p1, {t: 'join', name: 'V14', world}); await wait(p1, 'world');
+drain(p1); S(p1, {t: 'buy', key: 'b24'}); e = await lastEcon(p1);
+ok('House Entrance bisa dibeli di toko', cnt(e, 'b24') === 1);
+posAt(p1, 55, 29); posAt(dev, 56, 29); await sleep(250);
+drain(p1); S(p1, {t: 'act', a: 'place', i: at(53, 29), key: 'b24'});
+op = await wait(p1, 'ops', 900, m => m.ops && m.ops.some(o => o[0] === at(53, 29)));
+ok('House Entrance bisa dipasang pemilik lock', op && !op.denied && op.ops.find(o => o[0] === at(53, 29))[1] === 24, JSON.stringify(op));
+drain(p1); posAt(p1, 54, 29); await sleep(150); posAt(p1, 53, 29); let tp = await wait(p1, 'tp', 600);
+ok('Pemilik lock bisa masuk ke tile House Entrance', !tp, JSON.stringify(tp));
+posAt(p1, 52, 29); await sleep(150); tp = await wait(p1, 'tp', 400);
+ok('Pemilik lock bisa lewat ke sisi lain', !tp, JSON.stringify(tp));
+drain(dev); posAt(dev, 55, 29); await sleep(150); posAt(dev, 54, 29); await sleep(150); posAt(dev, 53, 29); tp = await wait(dev, 'tp', 800);
+ok('Pemain tanpa akses tertahan (server menolak posisi di dalam entrance)', tp && tp.fix, JSON.stringify(tp));
+// beri 'devi' akses di Crystal Lock (48,29) -> sekarang boleh lewat
+const LI = at(48, 29), lk = (await (async () => { drain(p1); S(p1, {t: 'join', name: 'V14', world}); const wm = await wait(p1, 'world'); return wm; })());
+const lockMeta = lk && new Map(lk.data ? lk.data.meta : lk.meta || []).get(LI);
+if (lockMeta){ lockMeta.lock.access = ['devi']; S(p1, {t: 'act', a: 'meta', i: LI, meta: lockMeta}); await sleep(300); }
+posAt(p1, 55, 29); await sleep(150);
+drain(dev); posAt(dev, 55, 29); await sleep(150); posAt(dev, 54, 29); await sleep(150); posAt(dev, 53, 29); tp = await wait(dev, 'tp', 700);
+ok('Setelah diberi akses lock, pemain itu bisa lewat House Entrance', !!lockMeta && !tp, (lockMeta ? '' : 'meta lock tidak ditemukan ') + JSON.stringify(tp));
+// ---------- v1.5: pesan pribadi /msg, /r, /ignore ----------
+const [q1] = await reg('pmsatu'); const [q2] = await reg('pmdua');
+S(q1, {t: 'join', name: 'PMA', world}); await wait(q1, 'world'); S(q2, {t: 'join', name: 'PMB', world}); await wait(q2, 'world');   // world berbeda
+drain(q1); drain(q2); S(q1, {t: 'chat', text: '/msg pmdua halo rahasia'});
+let pmIn = await wait(q2, 'pm', 800), pmOut = await wait(q1, 'pm', 800);
+ok('/msg sampai ke pemain di world lain', pmIn && pmIn.dir === 'from' && pmIn.name === 'pmsatu' && pmIn.text === 'halo rahasia', JSON.stringify(pmIn));
+ok('/msg: pengirim dapat salinan "ke"', pmOut && pmOut.dir === 'to' && pmOut.name === 'pmdua');
+drain(q1); drain(dev); S(q2, {t: 'chat', text: '/r balasan'});
+pmIn = await wait(q1, 'pm', 800);
+ok('/r membalas ke pengirim terakhir', pmIn && pmIn.name === 'pmdua' && pmIn.text === 'balasan');
+ok('/msg tidak bocor ke pemain lain', !(await wait(dev, 'pm', 300)));
+drain(q1); S(q1, {t: 'chat', text: '/msg tidakada halo'}); let nn = await wait(q1, 'note', 600);
+ok('/msg ke pemain offline/tidak ada -> pesan "tidak online"', nn && /tidak online/.test(nn.text));
+ok('/msg ditolak tidak ikut memunculkan "Perintah tidak dikenal"', !(await wait(q1, 'note', 400, m => /tidak dikenal/.test(m.text))));
+drain(q2); S(q2, {t: 'chat', text: '/ignore pmsatu'}); nn = await wait(q2, 'note', 600);
+ok('/ignore NAMA berhasil', nn && /mengabaikan pmsatu/.test(nn.text));
+drain(q1); drain(q2); S(q1, {t: 'chat', text: '/msg pmdua kamu dengar?'});
+pmOut = await wait(q1, 'pm', 600); pmIn = await wait(q2, 'pm', 500);
+ok('Pesan dari pemain yang di-ignore tidak sampai (pengirim tetap lihat terkirim)', pmOut && !pmIn);
+drain(q2); S(q2, {t: 'chat', text: '/ignore pmsatu'}); await wait(q2, 'note', 600);
+drain(q2); S(q1, {t: 'chat', text: '/msg pmdua sekarang?'}); pmIn = await wait(q2, 'pm', 700);
+ok('/ignore lagi = membuka blokir, pesan sampai lagi', pmIn && pmIn.text === 'sekarang?');
+drain(q1); for (let k = 0; k < 8; k++) S(q1, {t: 'chat', text: '/msg pmdua spam' + k}); await sleep(400);
+nn = await wait(q1, 'note', 600, m => /Terlalu cepat/.test(m.text));
+ok('/msg dibatasi (anti-spam)', !!nn);
 console.log(`\n${pass} lulus, ${fail} gagal`); process.exit(fail ? 1 : 0);

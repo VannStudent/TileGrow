@@ -26,7 +26,8 @@ function tileAt(x,y){ if (!inWorld(x,y)) return 7; return fg[idx(x,y)]; }
 function solidAt(x,y){
   const id = tileAt(x,y), d = BY_ID[id];
   if (!d) return false;
-  if (id === 21){ const m = meta.get(idx(x,y)); return !!(m && m.locked && !canBuild(x,y)); }
+  if (id === 21){ const m = meta.get(idx(x,y)); return !!(m && m.door && m.door.locked && !canBuild(x,y)); }   // v1.5: dulu salah baca m.locked
+  if (id === 24) return !canBuild(x,y);              // House Entrance: padat bagi yang tidak punya akses lock
   return d.solid;
 }
 
@@ -228,7 +229,8 @@ function chatCommand(line){
   if (c === 'warp' || c === 'world'){ if (!arg) return say('sys','Pakai: /warp NAMA'); return gotoWorld(arg); }
   if (c === 'worlds') return online() ? say('sys', 'World di server: ' + net.worldList.map(w => w.name).join(', ')) : say('sys', 'World kamu: ' + worldList().join(', '));
   if (c === 'who' && online()) return say('sys', 'Di world ini: ' + [who(), ...[...net.players.values()].map(r => r.name)].join(', '));
-  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, ' + (online() ? '/who, ' : '') + '/help' + (online() && net.role !== 'player' ? ' · staff: /staffhelp' : ''));
+  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, ' + (online() ? '/who, /msg NAMA pesan, /r pesan, /ignore NAMA, ' : '') + '/help' + (online() && net.role !== 'player' ? ' · staff: /staffhelp' : ''));
+  if (['msg', 'pm', 'r', 'ignore', 'unignore'].includes(c)) return say('sys', 'Pesan pribadi hanya bisa saat main online.');
   say('sys', 'Perintah tidak dikenal: /' + c);
 }
 function setPlayerName(n){

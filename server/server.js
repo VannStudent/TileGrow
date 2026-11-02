@@ -75,7 +75,7 @@ function validWorldData(d){
     && Array.isArray(d.trees) && Array.isArray(d.meta) && d.spawn && Number.isInteger(d.spawn.x) && Number.isInteger(d.spawn.y);
 }
 // v1.0.1: id block yang dikenal (sama dengan data.js). Block lain ditolak.
-const FG_IDS = new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,30,31,32,33,34,41,42,50,51,52,53,54,60,61,62]);
+const FG_IDS = new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,24,30,31,32,33,34,41,42,50,51,52,53,54,60,61,62]);
 const BG_IDS = new Set([0,40]);
 const PROTECTED = new Set([7, 23]);                    // Dasar & Pintu Utama: tidak bisa dipasang / dihapus pemain
 const LOCK_TYPE = {30: 'world', 31: 'small', 32: 'big', 33: 'huge', 34: 'world'};
@@ -228,6 +228,43 @@ class Client {
 
 function inWorld(name){ return [...clients].filter(c => c.world === name); }
 function broadcast(world, obj, except){ const f = wsFrame(JSON.stringify(obj)); for (const c of clients) if (c.world === world && c !== except && c.alive) try { c.sock.write(f); } catch(e){} }
+// v1.5: pesan pribadi /msg NAMA pesan, /r pesan (balas), /ignore NAMA (toggle), /ignore (daftar)
+function privateMsg(c, text){
+  const parts = text.slice(1).trim().split(/\s+/), cmd = (parts.shift() || '').toLowerCase();
+  if (!['msg', 'pm', 'r', 'ignore', 'unignore'].includes(cmd)) return false;
+  const me = accounts[c.user.toLowerCase()]; if (!me) return true;
+  const note = t => { c.send({t: 'note', text: t}); return true; };   // selalu true: command sudah ditangani
+  if (cmd === 'ignore' || cmd === 'unignore'){
+    me.ignore = Array.isArray(me.ignore) ? me.ignore : [];
+    if (!parts[0]) return note(me.ignore.length ? 'Kamu mengabaikan: ' + me.ignore.join(', ') + '. /unignore NAMA untuk membuka.' : 'Daftar ignore kosong. Pakai: /ignore NAMA');
+    const ta = accounts[parts[0].toLowerCase()]; if (!ta) return note('Pemain ' + parts[0] + ' tidak ditemukan.');
+    if (ta.name === me.name) return note('Tidak bisa ignore diri sendiri.');
+    const k = me.ignore.indexOf(ta.name), off = cmd === 'unignore' || k >= 0;
+    if (off){ if (k >= 0) me.ignore.splice(k, 1); } else { if (me.ignore.length >= 100) return note('Daftar ignore penuh (100).'); me.ignore.push(ta.name); }
+    saveAccounts();
+    return note(off ? ta.name + ' tidak diabaikan lagi.' : 'Kamu mengabaikan ' + ta.name + '. Pesan pribadinya tidak akan sampai. Ketik /ignore ' + ta.name + ' lagi untuk membuka.');
+  }
+  let name, body;
+  if (cmd === 'r'){ name = c.lastPm; body = parts.join(' '); if (!name) return note('Belum ada pesan pribadi untuk dibalas.'); }
+  else { name = parts.shift(); body = parts.join(' '); }
+  if (!name || !body) return note(cmd === 'r' ? 'Pakai: /r pesan' : 'Pakai: /msg NAMA pesan');
+  const mu = social.muteInfo(me);
+  if (mu) return note('Kamu di-mute sampai ' + new Date(mu.until).toLocaleTimeString('id-ID') + '.');
+  const now = Date.now(); c.pmRate = (c.pmRate || []).filter(t => now - t < 10000);
+  if (c.pmRate.length >= 6) return note('Terlalu cepat. Tunggu sebentar sebelum kirim pesan pribadi lagi.');
+  const o = findOnline(name);
+  if (!o || !visibleTo(o, c)) return note('Pemain ' + name + ' sedang tidak online.');
+  if (o === c) return note('Tidak bisa mengirim pesan ke diri sendiri.');
+  c.pmRate.push(now);
+  const ta = accounts[o.user.toLowerCase()] || {};
+  // diabaikan penerima: pengirim tetap melihat "terkirim" (supaya tidak ketahuan diblok), pesan tidak dikirim. Staff tidak bisa di-ignore.
+  const ignored = Array.isArray(ta.ignore) && ta.ignore.includes(me.name) && social.rankOf(c.user) < social.RANK.mod;
+  c.send({t: 'pm', dir: 'to', name: o.user, display: social.display(o.user), text: body});
+  if (ignored) return true;
+  o.lastPm = c.user;
+  o.send({t: 'pm', dir: 'from', name: c.user, display: social.display(c.user), role: social.roleOf(c.user), text: body});
+  return true;
+}
 function findOnline(name){ const k = String(name || '').toLowerCase(); for (const c of clients) if (c.user && c.user.toLowerCase() === k) return c; return null; }
 // pemain invisible (dev /invis) tidak dikirim ke pemain biasa
 const visibleTo = (o, viewer) => !o.invis || social.rankOf(viewer.user) >= RANK.mod;
@@ -312,12 +349,18 @@ setInterval(() => { const now = Date.now(); for (const w of worlds.values()) for
 // server tidak menjalankan fisika penuh; cukup batas kecepatan + tidak boleh berada di dalam block padat.
 // Staff dengan /noclip dibebaskan.
 const MAX_SPEED = 900;                                 // px/dtk (jalan 230, jatuh 430, lompat sayap ~900)
-function insideSolid(d, x, y){
+function insideSolid(d, x, y, u){
+  let meta = null, li = null;                          // dihitung hanya kalau menyentuh House Entrance
   const x0 = Math.floor((x + 3) / TS), x1 = Math.floor((x + 23) / TS), y0 = Math.floor((y + 3) / TS), y1 = Math.floor((y + 27) / TS);
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++){
     if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) return true;
     const id = d.fg[ty * COLS + tx];
     if (id === 21){ continue; }                           // pintu: bisa dilewati (pintu terkunci dicek di browser)
+    if (id === 24){                                      // House Entrance: padat bagi yang tidak punya akses lock
+      if (!meta){ meta = new Map(d.meta); li = lockIndex(meta); }
+      if (!canBuildAt(meta, li, ty * COLS + tx, u)) return true;
+      continue;
+    }
     if (econ.solid(id)) return true;
   }
   return false;
@@ -326,7 +369,7 @@ function checkMove(c, w, s){
   if (c.noclip) return true;
   const now = Date.now(), last = c.lastPos;
   if (c.frozen && last) return false;
-  if (insideSolid(w.data, s.x, s.y)) return false;
+  if (insideSolid(w.data, s.x, s.y, c.user)) return false;
   if (last){
     const dt = Math.max(.05, (now - last.t) / 1000), dist = Math.hypot(s.x - last.x, s.y - last.y);
     if (dist > MAX_SPEED * dt + TS * 2) return false;
@@ -501,7 +544,7 @@ function handleAct(c, m){
     }
     if (fgId !== 0) return deny(c, w, i, '');
     // tidak boleh memasang block padat di posisi pemain lain
-    if (def.solid) for (const o of inWorld(c.world)) if (o.state && insideSolidAt(o.state, tx, ty)) return deny(c, w, i, 'Ada pemain di situ.');
+    if (def.solid || def.entrance) for (const o of inWorld(c.world)) if (o.state && insideSolidAt(o.state, tx, ty)) return deny(c, w, i, 'Ada pemain di situ.');
     let mt = null;
     if (def.lock){
       if (def.lock === 'world'){
@@ -751,6 +794,7 @@ function handle(c, m){
       if (!text) return;
       if (text[0] === '/'){
         if (TEST && /^\/testgive /.test(text)){ const [, k, n] = text.split(' '); econ.run(econOf(c.user), g => k === 'gem' ? g.addGems(+n) : g.addItem(k, +n)); return pushEcon(c); }
+        if (privateMsg(c, text)) return;
         if (social.command(c, text)) return;
         return c.send({t: 'note', text: 'Perintah tidak dikenal: ' + text.split(' ')[0]});
       }
