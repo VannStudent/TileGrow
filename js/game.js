@@ -252,6 +252,7 @@ function placeBlock(tx,ty,d){
   if (def.wrench === 'door')    meta.set(i, {door:{name:'', locked:false}});
   if (def.wrench === 'display') meta.set(i, {display:{key:null}});
   if (def.wrench === 'vend')    meta.set(i, {vend:{owner:who(), key:null, n:0, price:0, earned:0}});
+  if (def.wrench === 'chess')   meta.set(i, {chess: Chess.newTable()});
   netTouch(i); stat('placed',1); questEvent('place',null,1);
 }
 
@@ -447,6 +448,7 @@ function wrenchAt(tx,ty){
     return openDialog('lock', {tx,ty,i});
   }
   if (def.wrench === 'vend') return openVend(i);     // v1.4: siapa pun boleh membuka (untuk membeli)
+  if (def.wrench === 'chess') return openChess(i);   // v1.7: siapa pun boleh main / menonton
   if (!canBuild(tx,ty)) return denied();
   openDialog(def.wrench, {tx,ty,i});
 }

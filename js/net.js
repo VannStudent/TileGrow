@@ -179,6 +179,7 @@ function netOnMessage(m){
     case 'ops':
       applyOps(m.from, m.ops || []);
       if (typeof vendOpen !== 'undefined' && vendOpen !== null && (m.ops || []).some(o => o[0] === vendOpen)) renderVend();
+      if (typeof chessOpen !== 'undefined' && chessOpen !== null && (m.ops || []).some(o => o[0] === chessOpen)){ chessSel = -1; chessPromo = null; renderChess(); }
       if (m.denied){ if (m.why) toast(m.why); sfx('deny'); }
       return;
     case 'chat': {
@@ -198,6 +199,8 @@ function netOnMessage(m){
     case 'note': if (m.once){ net.notes = net.notes || new Set(); if (net.notes.has(m.once)) return; net.notes.add(m.once); } toast(m.text); say('sys', m.text); return;
     case 'staff': say('staff', m.text); return;
     case 'news': return onNews(m);
+    case 'emote': return onEmote(m);
+    case 'chessMsg': say('sys', '♟ ' + m.text); return;
     case 'bcast': return onBroadcast(m);
     case 'pm': say(m.dir === 'to' ? 'pmto' : 'pm', (m.dir === 'to' ? 'ke ' : 'dari ') + (m.display || m.name) + ': ' + m.text); if (m.dir === 'from') sfx('pick'); return;
     case 'role': net.role = m.role; net.display = m.display; toast('Role kamu sekarang: ' + ({mod:'Moderator', dev:'Developer', owner:'Owner'}[m.role] || 'Player')); refreshUI(); return;

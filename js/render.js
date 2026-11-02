@@ -295,9 +295,12 @@ function drawPlayer(rx, ry){
     flap: pl.flap > 0 ? Math.sin((1 - pl.flap/.3) * Math.PI) : (!pl.onGround ? (Math.sin(now/110) + 1)/2 : (Math.sin(now/700) + 1)/4),
     blink: (now % 3200) < 120, mouth: pl.swing > 0 || pl.hurt > 0
   };
+  // v1.7: emote mengubah pose/wajah (js/emotes.js); pukul atau jalan membatalkan emote
+  if (pl.emote && (pl.swing > 0 || walking || !pl.onGround)) pl.emote = null;
+  const ep = typeof emotePose === 'function' ? emotePose(pl, o) : null;
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, ground - 1, 9, 2.5, 0, 0, Math.PI*2); ctx.fill();
-  const hand = drawPixelChar(ctx, x, ground, f, o, sqx, sqy);
+  const hand = drawPixelChar(ctx, x + (ep ? ep.dx : 0), ground + (ep ? ep.dy : 0), f * (ep ? ep.flip : 1), o, sqx, sqy);
   // item yang dipegang di kepalan tangan depan
   if (s && s.key !== FIST && pl.swing === 0){
     const d = itemDef(s.key), U = hand.U;
@@ -337,7 +340,9 @@ function drawPlayer(rx, ry){
     if (typeof flagImg === 'function') ctx.drawImage(flagImg(playerFlag), x + 6 - nw/2 - 15, ry - 13, 12, 8);
     ctx.textAlign = 'left';
   }
-  drawBubble(x, ry - (settings.showNames ? 14 : 4));
+  const topY = ry - (settings.showNames ? 14 : 4);
+  if (typeof drawEmoteIcon === 'function' && drawEmoteIcon(pl, x, topY - (bubble && Date.now() < bubble.until ? 26 : 0))){}
+  drawBubble(x, topY);
 }
 
 // balon chat di atas kepala (seperti Growtopia), hilang setelah beberapa detik

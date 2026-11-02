@@ -133,14 +133,30 @@ function pxPaintChar(P, o){
   P.rect(-8, hy + 5, 1, 3, skin); P.set(-8, hy + 6, skinD);
   P.rect(-5, hy + 1, 3, 1, skinL); P.set(-6, hy + 2, skinL);
   P.flush();
-  const ey = hy + 5;
-  if (o.blink){ P.rect(0, ey + 2, 2, 1, OL); P.rect(3, ey + 2, 2, 1, OL); }
+  const ey = hy + 5, fc = o.face;
+  if (fc === 'closed' || fc === 'happy' || fc === 'sad'){
+    // mata tertutup: garis datar (tidur), lengkung ke atas (senang), lengkung ke bawah (sedih)
+    if (fc === 'happy'){ for (const ex of [0, 3]){ P.set(ex, ey + 1, OL); P.set(ex + 1, ey, OL); P.set(ex + 2, ey + 1, OL); } }
+    else if (fc === 'sad'){ for (const ex of [0, 3]){ P.set(ex, ey, OL); P.set(ex + 1, ey + 1, OL); P.set(ex + 2, ey, OL); } }
+    else { P.rect(0, ey + 1, 2, 1, OL); P.rect(3, ey + 1, 2, 1, OL); }
+    if (fc === 'sad'){ P.set(-1, ey - 2, '#6a4030'); P.set(0, ey - 3, '#6a4030'); P.set(4, ey - 3, '#6a4030'); P.set(5, ey - 2, '#6a4030'); }
+  } else if (fc === 'angry'){
+    P.rect(0, ey - 1, 2, 4, '#ffffff'); P.rect(3, ey - 1, 2, 4, '#ffffff'); P.rect(1, ey + 1, 1, 2, OL); P.rect(4, ey + 1, 1, 2, OL);
+    P.set(-1, ey - 2, OL); P.set(0, ey - 1, OL); P.set(1, ey - 1, OL); P.set(5, ey - 2, OL); P.set(4, ey - 1, OL); P.set(3, ey - 1, OL);
+  } else if (fc === 'love'){
+    for (const ex of [0, 3]){ P.set(ex, ey, '#e8344a'); P.set(ex + 1, ey, '#e8344a'); P.rect(ex, ey + 1, 2, 1, '#e8344a'); P.set(ex, ey - 1, '#ff7a8a'); P.set(ex + 1, ey + 2, '#a8122a'); }
+  } else if (o.blink){ P.rect(0, ey + 2, 2, 1, OL); P.rect(3, ey + 2, 2, 1, OL); }
   else {
     P.rect(0, ey - 1, 2, 4, '#ffffff'); P.rect(3, ey - 1, 2, 4, '#ffffff');
     P.rect(1, ey, 1, 3, OL); P.rect(4, ey, 1, 3, OL);
     P.set(0, ey - 2, '#6a4030'); P.set(1, ey - 3, '#6a4030'); P.set(3, ey - 3, '#6a4030'); P.set(4, ey - 2, '#6a4030');
   }
-  if (o.mouth) P.rect(2, hy + 10, 2, 2, OL); else { P.set(1, hy + 9, OL); P.rect(2, hy + 10, 3, 1, OL); P.set(5, hy + 9, OL); }
+  if (o.mouthKind === 'open'){ P.rect(1, hy + 9, 4, 3, OL); P.rect(2, hy + 10, 2, 1, '#e8566a'); }
+  else if (o.mouthKind === 'frown'){ P.set(1, hy + 10, OL); P.rect(2, hy + 9, 3, 1, OL); P.set(5, hy + 10, OL); }
+  else if (o.mouthKind === 'o'){ P.rect(2, hy + 9, 2, 2, OL); }
+  else if (o.mouth) P.rect(2, hy + 10, 2, 2, OL); else { P.set(1, hy + 9, OL); P.rect(2, hy + 10, 3, 1, OL); P.set(5, hy + 9, OL); }
+  if (o.tears){ const k = o.tears % 4; P.set(0, ey + 3 + k, '#5ab8ff'); P.set(4, ey + 3 + ((k + 2) % 4), '#5ab8ff'); }
+  if (o.blush){ P.set(-2, hy + 8, '#ff8a8a'); P.set(-1, hy + 8, '#ff8a8a'); P.set(5, hy + 8, '#ff8a8a'); }
   P.flush(true);
   // topi
   if (o.hat){

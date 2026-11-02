@@ -229,7 +229,9 @@ function chatCommand(line){
   if (c === 'warp' || c === 'world'){ if (!arg) return say('sys','Pakai: /warp NAMA'); return gotoWorld(arg); }
   if (c === 'worlds') return online() ? say('sys', 'World di server: ' + net.worldList.map(w => w.name).join(', ')) : say('sys', 'World kamu: ' + worldList().join(', '));
   if (c === 'who' && online()) return say('sys', 'Di world ini: ' + [who(), ...[...net.players.values()].map(r => r.name)].join(', '));
-  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, ' + (online() ? '/who, /msg NAMA pesan, /r pesan, /ignore NAMA, /broadcast pesan, ' : '') + '/help' + (online() && net.role !== 'player' ? ' · staff: /staffhelp' : ''));
+  if (c === 'emotes' || c === 'emote') return say('sys', 'Emote: /wave, /dance, /cry, /laugh, /angry, /love, /sleep, /cheer (atau /lambai, /joget, /nangis, /ketawa, /marah, /cinta, /tidur, /hore).');
+  if (typeof emoteName === 'function' && emoteName(c)){ startEmote(pl, emoteName(c)); return; }
+  if (c === 'help') return say('sys', 'Perintah: /warp NAMA, /worlds, /emotes, ' + (online() ? '/who, /msg NAMA pesan, /r pesan, /ignore NAMA, /broadcast pesan, ' : '') + '/help' + (online() && net.role !== 'player' ? ' · staff: /staffhelp' : ''));
   if (['msg', 'pm', 'r', 'ignore', 'unignore'].includes(c)) return say('sys', 'Pesan pribadi hanya bisa saat main online.');
   if (c === 'broadcast' || c === 'bc') return say('sys', 'Broadcast hanya bisa saat main online.');
   say('sys', 'Perintah tidak dikenal: /' + c);

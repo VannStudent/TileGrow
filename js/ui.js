@@ -254,7 +254,7 @@ const SHOP_CATS = [
   {id:'wear',   name:'Wearables',       tag:'Sayap, baju, topi', color:['#e85aa8','#8a2a7a'], icon:'w_devil'},
   {id:'lock',   name:'Lock & Alat',     tag:'Amankan world-mu',  color:['#7fd8f5','#2d6c8a'], icon:'b30'},
   {id:'khusus', name:'Block Khusus',    tag:'Papan, pintu, vending', color:['#c99159','#73491f'], icon:'b21'},
-  {id:'fun',    name:'Interaktif',      tag:'Dadu & roulette',   color:['#ff7a5a','#a8322a'], icon:'b61'},
+  {id:'fun',    name:'Interaktif',      tag:'Dadu, roulette, catur',   color:['#ff7a5a','#a8322a'], icon:'b61'},
   {id:'block',  name:'Block Bangunan',  tag:'Isi ulang stok',    color:['#a2abb9','#515a69'], icon:'b9'}
 ];
 let shopTab = 'home', shopSel = null;

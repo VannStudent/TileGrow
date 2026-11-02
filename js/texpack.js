@@ -193,6 +193,16 @@ function makeTex32(id, v){
       t3px(g, 5, 0, '#c99a5a', 22, 3); t3px(g, 5, 0, '#e8c088', 22, 1);      // ambang atas
       t3px(g, 3, 29, '#7d8697', 26, 3); t3px(g, 3, 29, '#b9c3d2', 26, 1);    // anak tangga batu
       t3edge(g, '#2a1808'); break; }
+    case 63: {   // v1.7 papan catur: meja kayu dengan kaki, papan 8x8 miring sedikit, dua bidak (raja putih & kuda hitam)
+      const ol = '#17121c', wd = '#8a5a2b', wdD = '#5a3c1e', wdL = '#c08a50';
+      t3px(g, 3, 24, ol, 4, 8); t3px(g, 4, 24, wdD, 2, 7); t3px(g, 25, 24, ol, 4, 8); t3px(g, 26, 24, wdD, 2, 7);   // kaki
+      t3px(g, 0, 17, ol, 32, 8); t3px(g, 1, 18, wd, 30, 6); t3px(g, 1, 18, wdL, 30, 1); t3px(g, 1, 23, wdD, 30, 1);    // daun meja
+      t3px(g, 3, 13, ol, 26, 6); for (let k = 0; k < 8; k++){ t3px(g, 4 + k*3, 14, k % 2 ? '#b58863' : '#f0d9b5', 3, 2); t3px(g, 4 + k*3, 16, k % 2 ? '#f0d9b5' : '#b58863', 3, 2); }
+      // raja putih
+      t3px(g, 7, 2, ol, 3, 1); t3px(g, 8, 1, ol, 1, 3); t3px(g, 6, 4, ol, 5, 10); t3px(g, 7, 5, '#ffffff', 3, 8); t3px(g, 5, 12, ol, 7, 2); t3px(g, 6, 12, '#e8e8e8', 5, 1); t3px(g, 7, 5, '#dcdcdc', 1, 8);
+      // kuda hitam
+      t3px(g, 19, 4, ol, 6, 10); t3px(g, 18, 6, ol, 3, 3); t3px(g, 20, 5, '#3a3448', 4, 8); t3px(g, 19, 7, '#3a3448', 2, 1); t3px(g, 22, 6, '#ffd23d', 1, 1); t3px(g, 18, 12, ol, 8, 2); t3px(g, 19, 12, '#2a2436', 6, 1);
+      break; }
     default: return null;
   }
   return c;

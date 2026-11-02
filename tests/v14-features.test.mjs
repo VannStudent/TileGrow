@@ -234,4 +234,65 @@ ok('Pemain biasa tidak bisa mengedit berita', nn && /Hanya Developer/.test(nn.te
 drain(p1); drain(dev); S(dev, {t: 'newsSet', text: '# Event Panen\n## 3 Nov: Panen Raya\nDrop {gems} x2 di world [START].\n! Jangan scam.'});
 nw = await wait(p1, 'news', 4000);
 ok('Developer mengedit berita -> terkirim ke semua pemain', nw && /Panen Raya/.test(nw.text), JSON.stringify(nw));
+// ---------- v1.7: emote ----------
+const [e1] = await reg('emsatu'); const [e2] = await reg('emdua'); const [e3] = await reg('emtiga');
+for (const w of [e1, e2]){ S(w, {t: 'join', name: 'EMO', world}); await wait(w, 'world'); }
+S(e3, {t: 'join', name: 'EMOLAIN', world}); await wait(e3, 'world');
+drain(e1); drain(e2); drain(e3); S(e1, {t: 'chat', text: '/wave'});
+let em1 = await wait(e1, 'emote', 700), em2 = await wait(e2, 'emote', 700), em3 = await wait(e3, 'emote', 300);
+ok('/wave sampai ke diri sendiri & pemain di world yang sama', em1 && em1.e === 'wave' && em2 && em2.e === 'wave' && em2.id === em1.id);
+ok('emote tidak bocor ke world lain', !em3);
+drain(e2); S(e1, {t: 'chat', text: '/joget'}); em2 = await wait(e2, 'emote', 700);
+ok('alias Indonesia /joget = dance', em2 && em2.e === 'dance');
+for (const x of ['cry', 'laugh', 'angry']) S(e1, {t: 'chat', text: '/' + x});
+await sleep(150); drain(e1); S(e1, {t: 'chat', text: '/love'}); nn = await wait(e1, 'note', 700);
+ok('emote dibatasi 5 per 10 detik', nn && /Terlalu cepat/.test(nn.text), nn && nn.text);
+drain(e1); S(e1, {t: 'chat', text: '/emotes'}); nn = await wait(e1, 'note', 700);
+ok('/emotes menampilkan daftar', nn && /\/wave/.test(nn.text) && /\/sleep/.test(nn.text));
+
+// ---------- v1.7: Papan Catur ----------
+const [c1] = await reg('catursatu'); const [c2] = await reg('caturdua'); const [c3] = await reg('caturtiga');
+const CW = 'CATUR', ci = at(52, 28);
+for (const w of [c1, c2, c3]){ S(w, {t: 'join', name: CW, world}); await wait(w, 'world'); }
+posAt(c1, 51, 29); posAt(c2, 53, 29); posAt(c3, 50, 29); await sleep(150);
+S(c1, {t: 'chat', text: '/testgive gem 250'}); await lastEcon(c1);
+S(c1, {t: 'buy', key: 'b63'}); let ec = await lastEcon(c1);
+ok('Papan Catur dijual di toko seharga 200 gems', ec && cnt(ec, 'b63') === 1 && ec.gems === 100, 'gems ' + (ec && ec.gems));
+drain(c1); S(c1, {t: 'act', a: 'place', i: ci, key: 'b63'}); let opsC = await wait(c1, 'ops', 900);
+const tbl = () => { const o = opsC && opsC.ops.find(o => o[0] === ci); return o && o[3] && o[3].chess; };
+ok('Papan Catur terpasang dengan meja kosong', tbl() && tbl().w === null && tbl().g.b.startsWith('rnbqkbnr'), JSON.stringify(opsC && opsC.ops[0]).slice(0, 120));
+const act = async (w, op, a = {}) => { drain(w); drain(c3); S(w, {t: 'chess', i: ci, op, ...a}); const o = await wait(c3, 'ops', 900, m => m.ops.some(x => x[0] === ci)); if (o) opsC = o; const n = await wait(w, 'note', 150); return n ? n.text : null; };
+const sq = s => (8 - +s[1]) * 8 + 'abcdefgh'.indexOf(s[0]);
+await act(c1, 'sit', {side: 'w'}); await act(c2, 'sit', {side: 'b'});
+ok('Dua pemain duduk (putih & hitam)', tbl() && tbl().w === 'catursatu' && tbl().b === 'caturdua');
+let r = await act(c3, 'sit', {side: 'w'});
+ok('Kursi terisi tidak bisa direbut', /sudah dipakai/.test(r || ''), r);
+r = await act(c2, 'move', {from: sq('e7'), to: sq('e5')});
+ok('Hitam tidak boleh jalan duluan', /Bukan giliranmu/.test(r || ''), r);
+r = await act(c1, 'move', {from: sq('e2'), to: sq('e5')});
+ok('Langkah tidak sah ditolak server', /tidak sah/.test(r || ''), r);
+r = await act(c3, 'move', {from: sq('e2'), to: sq('e4')});
+ok('Penonton tidak bisa melangkah', /tidak duduk/.test(r || ''), r);
+// skakmat cepat (fool's mate): 1. f3 e5 2. g4 Qh4#
+for (const [w, f, t2] of [[c1, 'f2', 'f3'], [c2, 'e7', 'e5'], [c1, 'g2', 'g4'], [c2, 'd8', 'h4']]) await act(w, 'move', {from: sq(f), to: sq(t2)});
+ok('Skakmat terdeteksi server (hitam menang)', tbl() && /Skakmat/.test(tbl().res || '') && /Hitam/.test(tbl().res), tbl() && tbl().res);
+ok('Log langkah tercatat', tbl() && tbl().log.length === 4, tbl() && tbl().log.join(' '));
+r = await act(c1, 'move', {from: sq('e2'), to: sq('e4')});
+ok('Setelah selesai tidak bisa melangkah', /sudah selesai/.test(r || ''), r);
+await act(c1, 'reset');
+ok('Main lagi mengulang papan', tbl() && !tbl().res && tbl().log.length === 0 && tbl().g.b.startsWith('rnbqkbnr'));
+// lawan bot
+await act(c2, 'leave');
+r = await act(c1, 'bot', {level: 2});
+ok('Mulai lawan bot (Sedang)', tbl() && tbl().bot === 2 && tbl().b === null, r);
+drain(c3); S(c1, {t: 'chess', i: ci, op: 'move', from: sq('e2'), to: sq('e4')});
+let botOps = null; for (let k = 0; k < 6 && !(botOps && botOps.ops.find(o => o[0] === ci)[3].chess.log.length === 2); k++){ const o = await wait(c3, 'ops', 1500, m => m.ops.some(x => x[0] === ci)); if (o) botOps = o; }
+const bt = botOps && botOps.ops.find(o => o[0] === ci)[3].chess;
+ok('Bot membalas langkah (giliran kembali ke putih)', bt && bt.log.length === 2 && bt.g.t === 'w', bt && bt.log.join(' '));
+// pecah papan saat main bot = ditolak
+drain(c1); S(c1, {t: 'act', a: 'hit', i: ci}); let dnC = await wait(c1, "ops", 700, m => m.denied);
+ok("Papan tidak bisa dipecah saat permainan berjalan", dnC && /sedang berjalan/.test(dnC.why || ""), dnC && dnC.why);
+// meta palsu ditolak
+drain(c1); S(c1, {t: 'act', a: 'meta', i: ci, meta: {chess: {w: "catursatu", b: null, bot: 0, g: {b: "K".repeat(64)}, last: null, res: null, log: []}}}); dnC = await wait(c1, 'ops', 700, m => m.denied);
+ok("Meta catur palsu dari klien ditolak", !!dnC);
 console.log(`\n${pass} lulus, ${fail} gagal`); process.exit(fail ? 1 : 0);

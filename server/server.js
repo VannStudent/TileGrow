@@ -16,9 +16,10 @@ const readline = require('readline');
 const {loadEcon} = require('./econ');
 const {createSocial, RANK} = require('./social');
 const {createNews} = require('./news');
+const Chess = require('../js/chess.js');
 
 const PORT = +process.env.PORT || 8080;
-const VERSION = 'v1.6';
+const VERSION = 'v1.7';
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = path.resolve(__dirname, '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
@@ -76,7 +77,7 @@ function validWorldData(d){
     && Array.isArray(d.trees) && Array.isArray(d.meta) && d.spawn && Number.isInteger(d.spawn.x) && Number.isInteger(d.spawn.y);
 }
 // v1.0.1: id block yang dikenal (sama dengan data.js). Block lain ditolak.
-const FG_IDS = new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,24,30,31,32,33,34,41,42,50,51,52,53,54,60,61,62]);
+const FG_IDS = new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,24,30,31,32,33,34,41,42,50,51,52,53,54,60,61,62,63]);
 const BG_IDS = new Set([0,40]);
 const PROTECTED = new Set([7, 23]);                    // Dasar & Pintu Utama: tidak bisa dipasang / dihapus pemain
 const LOCK_TYPE = {30: 'world', 31: 'small', 32: 'big', 33: 'huge', 34: 'world'};
@@ -87,12 +88,13 @@ const isName = v => typeof v === 'string' && /^[A-Za-z0-9]{1,16}$/.test(v);
 const isStr = (v, n) => typeof v === 'string' && v.length <= n;
 // bentuk meta harus cocok dengan block-nya; kalau tidak, data bisa membuat game pemain lain error
 function validMeta(f, i, mt){
-  const need = LOCK_TYPE[f] ? 'lock' : f === 20 ? 'sign' : f === 21 ? 'door' : f === 22 ? 'display' : f === 62 ? 'vend' : null;
+  const need = LOCK_TYPE[f] ? 'lock' : f === 20 ? 'sign' : f === 21 ? 'door' : f === 22 ? 'display' : f === 62 ? 'vend' : f === 63 ? 'chess' : null;
   if (!need) return mt === null || mt === undefined;
   if (!mt || typeof mt !== 'object' || Object.keys(mt).length !== 1 || !mt[need] || typeof mt[need] !== 'object') return false;
   const v = mt[need];
   if (need === 'sign') return isStr(v.text, 120);
   if (need === 'door') return isStr(v.name, 24) && typeof v.locked === 'boolean';
+  if (need === 'chess') return Chess.validTable(v);
   if (need === 'display') return v.key === null || (isStr(v.key, 24) && /^[a-z0-9_]+$/i.test(v.key));
   if (need === 'vend') return isName(v.owner) && (v.key === null || (econ.isKey(v.key) && v.key !== D.FIST && v.key !== D.WRENCH))
     && Number.isInteger(v.n) && v.n >= 0 && v.n <= D.STACK && Number.isInteger(v.price) && v.price >= 0 && v.price <= VEND_PRICE_MAX
@@ -229,6 +231,20 @@ class Client {
 
 function inWorld(name){ return [...clients].filter(c => c.world === name); }
 function broadcast(world, obj, except){ const f = wsFrame(JSON.stringify(obj)); for (const c of clients) if (c.world === world && c !== except && c.alive) try { c.sock.write(f); } catch(e){} }
+// v1.7: emote (/wave, /dance, ...): animasi karakter + ikon di atas kepala, dilihat semua pemain di world yang sama.
+const EMOTES = new Set(['wave', 'dance', 'cry', 'laugh', 'angry', 'love', 'sleep', 'cheer']);
+const EMOTE_ALIAS = {lambai: 'wave', joget: 'dance', nangis: 'cry', ketawa: 'laugh', marah: 'angry', cinta: 'love', tidur: 'sleep', hore: 'cheer'};
+function emoteCmd(c, text){
+  let cmd = text.slice(1).trim().split(/\s+/)[0].toLowerCase(); cmd = EMOTE_ALIAS[cmd] || cmd;
+  if (cmd === 'emotes' || cmd === 'emote'){ c.send({t: 'note', text: 'Emote: /' + [...EMOTES].join(', /') + '. Bahasa Indonesia juga bisa: /lambai, /joget, /nangis, /ketawa, /marah, /cinta, /tidur, /hore.'}); return true; }
+  if (!EMOTES.has(cmd)) return false;
+  const now = Date.now(); c.emT = (c.emT || []).filter(t => now - t < 10e3);
+  if (c.emT.length >= 5){ c.send({t: 'note', text: 'Terlalu cepat. Tunggu sebentar.'}); return true; }
+  c.emT.push(now);
+  const msg = {t: 'emote', id: c.id, e: cmd};
+  for (const o of clients) if (o.world === c.world && (o === c || visibleTo(c, o))) o.send(msg);
+  return true;
+}
 // v1.6: /broadcast pesan — ke SEMUA pemain online di semua world, bayar gems.
 // Harga 1000, naik +1000 untuk setiap broadcast lain dalam 10 menit terakhir (maks 5000). Jeda 2 menit per pemain, maks 120 huruf.
 const fmt = n => Number(n).toLocaleString('id-ID');
@@ -517,6 +533,7 @@ function handleAct(c, m){
     if (om && om.lock && om.lock.owner !== u) return deny(c, w, i, 'Lock milik ' + om.lock.owner + '.');
     if (om && om.vend && (om.vend.n || om.vend.earned))
       return deny(c, w, i, om.vend.owner === u ? 'Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.' : 'Vending Machine milik ' + om.vend.owner + '. Pakai kunci inggris untuk membeli.');
+    if (om && om.chess && om.chess.log.length && !om.chess.res && (om.chess.b || om.chess.bot)) return deny(c, w, i, 'Permainan catur sedang berjalan. Tunggu selesai dulu.');
     if (om && om.display && om.display.key){
       const k = om.display.key; applyTile(w, i, fgId, d.bgw[i], {display: {key: null}}, null); dropsAt(w, tx, ty, [[k, 1]]); return;
     }
@@ -587,6 +604,7 @@ function handleAct(c, m){
     else if (def.wrench === 'door') mt = {door: {name: '', locked: false}};
     else if (def.wrench === 'display') mt = {display: {key: null}};
     else if (def.wrench === 'vend') mt = {vend: {owner: u, key: null, n: 0, price: 0, earned: 0}};
+    else if (def.wrench === 'chess') mt = {chess: Chess.newTable()};
     econ.run(E, g => { g.takeItem(key, 1); g.stat('placed', 1); g.questEvent('place', null, 1); if (def.lock === 'world') g.stat('worldLocks', 1); });
     applyTile(w, i, id, d.bgw[i], mt, null);
     saveEcon(u); return pushEcon(c);
@@ -595,6 +613,7 @@ function handleAct(c, m){
     // simpan dialog wrench (papan, pintu, kotak pajang, lock)
     const mt = m.meta; if (!om || !mt || typeof mt !== 'object') return;
     if (om.vend) return deny(c, w, i, '');               // vending diatur lewat aksi 'vend' (stok & gems dihitung server)
+    if (om.chess) return deny(c, w, i, '');              // catur diatur lewat aksi 'chess' (langkah dicek server)
     if (!validMeta(fgId, i, mt)) return deny(c, w, i, 'Data tidak valid.');
     if (om.lock){
       if (om.lock.owner !== u) return deny(c, w, i, 'Hanya pemilik lock.');
@@ -620,6 +639,33 @@ const rollS = new Map(), ROLL_BUSY_MS = 1400;
 // stok disimpan di mesin; pembeli bayar gems, gems masuk ke kas mesin sampai diambil pemilik.
 // Semua dihitung di sini, jadi browser tidak bisa memalsukan stok, harga, atau kas.
 const VEND_PRICE_MAX = 100000;
+// v1.7: Papan Catur. Semua langkah dicek di server (js/chess.js); bot dihitung di server juga.
+const chessBusy = new Set();
+function handleChess(c, m){
+  const w = worlds.get(c.world); if (!w || c.frozen) return;
+  const i = m.i; if (!Number.isInteger(i) || i < 0 || i >= N) return;
+  const d = w.data, meta = new Map(d.meta), om = meta.get(i);
+  if (d.fg[i] !== 63 || !om || !om.chess) return;
+  const tx = i % COLS, ty = (i / COLS) | 0;
+  const op = String(m.op || '');
+  // duduk / mulai bot / ulang harus dekat papan; yang sudah duduk boleh melangkah dari mana saja di world ini
+  if ((op === 'sit' || op === 'bot' || op === 'reset') && !inReachS(c, tx, ty)) return c.send({t: 'note', text: 'Terlalu jauh dari Papan Catur.'});
+  const k = c.world + ':' + i; if (chessBusy.has(k) && op === 'move') return c.send({t: 'note', text: 'Bot sedang berpikir...'});
+  const canAdmin = canBuildAt(meta, lockIndex(meta), i, c.user);
+  const r = Chess.tableAct(om.chess, c.user, op, m, canAdmin);
+  if (r.err) return c.send({t: 'note', text: r.err});
+  applyTile(w, i, 63, d.bgw[i], {chess: r.T}, null);
+  if (r.msg) broadcast(c.world, {t: 'chessMsg', i, text: r.msg});
+  if (r.botDue){
+    chessBusy.add(k);
+    setTimeout(() => {
+      chessBusy.delete(k);
+      const w2 = worlds.get(w.name); if (!w2) return;
+      const om2 = new Map(w2.data.meta).get(i); if (w2.data.fg[i] !== 63 || !om2 || !om2.chess) return;
+      const T = Chess.botStep(om2.chess); if (T) applyTile(w2, i, 63, w2.data.bgw[i], {chess: T}, null);
+    }, 450 + Math.floor(Math.random() * 500));
+  }
+}
 function handleVend(c, m){
   const w = worlds.get(c.world); if (!w || c.frozen) return;
   const i = m.i; if (!Number.isInteger(i) || i < 0 || i >= N) return;
@@ -747,6 +793,7 @@ function handle(c, m){
     case 'leave': leaveWorld(c); return c.send({t: 'left'});
     case 'act': return handleAct(c, m);
     case 'vend': return handleVend(c, m);
+    case 'chess': return handleChess(c, m);
     case 'ops': return c.send({t: 'err', text: 'Versi game lama. Muat ulang halaman (Ctrl+F5).'});
     case 'pos': {
       if (!c.world || !m.s || typeof m.s !== 'object') return;
@@ -839,6 +886,7 @@ function handle(c, m){
         if (TEST && /^\/testgive /.test(text)){ const [, k, n] = text.split(' '); econ.run(econOf(c.user), g => k === 'gem' ? g.addGems(+n) : g.addItem(k, +n)); return pushEcon(c); }
         if (privateMsg(c, text)) return;
         if (broadcastCmd(c, text)) return;
+        if (emoteCmd(c, text)) return;
         if (social.command(c, text)) return;
         return c.send({t: 'note', text: 'Perintah tidak dikenal: ' + text.split(' ')[0]});
       }

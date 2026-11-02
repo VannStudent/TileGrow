@@ -25,7 +25,8 @@ const PAL = {
   52:['#3a3238','#1a1418','#ff7a2a'],  53:['#e0a52a','#7a4f10','#fff3a0'],
   54:['#e85aa8','#7a2a6a','#ffe0f4'],
   34:['#5ae0f0','#1f6a8a','#e8ffff'],  60:['#f4f6fa','#9aa3b5','#ffffff'],
-  61:['#2a8a4a','#14472a','#f0d24a'],  62:['#3a7bd8','#1d3f78','#bfe6ff']
+  61:['#2a8a4a','#14472a','#f0d24a'],  62:['#3a7bd8','#1d3f78','#bfe6ff'],
+  63:['#d9b27a','#5a3c1e','#f4e2c0']
 };
 // kind: block padat, bg = dinding belakang, deco = tidak padat
 const T = {
@@ -70,6 +71,8 @@ const T = {
   DICE:   {id:60, name:'Dadu',          hits:4, xp:1,  price:150, roll:'dice'},
   ROULETTE:{id:61,name:'Roda Roulette', hits:5, xp:1,  price:400, roll:'roulette'},
   VEND:   {id:62, name:'Vending Machine', hits:5, xp:2, price:500, wrench:'vend'},
+  // v1.7: Papan Catur — wrench = buka meja catur (lawan pemain lain atau bot), aturan lengkap (js/chess.js)
+  CHESS:  {id:63, name:'Papan Catur',   hits:4, xp:2, price:200, deco:1, wrench:'chess'},
   PLANKP: {id:41, name:'Platform Kayu',hits:3,  xp:2,  price:5, platform:1},
   ROCKP:  {id:42, name:'Platform Batu',hits:5,  xp:2,  price:6, platform:1}
 };
@@ -133,7 +136,7 @@ const RARITY = {
 };
 const RARITY_FIXED = {b7:'mythic', b23:'mythic', b34:'mythic', b30:'legendary', b33:'epic', b32:'rare', b31:'uncommon',
   b14:'epic', b13:'rare', b12:'uncommon', b11:'rare', b15:'rare', b54:'legendary', s54:'legendary', b53:'epic', s53:'epic',
-  b52:'epic', s52:'epic', b51:'rare', s51:'rare', b50:'uncommon', s50:'uncommon', b61:'rare', b60:'uncommon', b62:'rare', gem:'common'};
+  b52:'epic', s52:'epic', b51:'rare', s51:'rare', b50:'uncommon', s50:'uncommon', b61:'rare', b60:'uncommon', b62:'rare', b63:'uncommon', gem:'common'};
 function rarityOf(key){
   if (RARITY_FIXED[key]) return RARITY_FIXED[key];
   if (key === FIST || key === WRENCH) return 'common';
@@ -188,6 +191,7 @@ const SHOP = [
   {key:'bag8', name:'Upgrade Tas +8 slot', desc:'Tambah 8 slot tas', price:'bag', give:[]},
   {key:'b60', tab:'fun', name:'Dadu',          desc:'Pukul untuk melempar dadu 1–6. Hasilnya dilihat semua orang di world', price:150, give:[['b60',1]]},
   {key:'b62', name:'Vending Machine', desc:'Jual item ke pemain lain: isi stok, pasang harga, gems masuk ke mesin', price:500, give:[['b62',1]]},
+  {key:'b63', tab:'fun', name:'Papan Catur', desc:'Meja catur sungguhan: pakai kunci inggris untuk main lawan pemain lain atau bot (Mudah/Sedang/Sulit)', price:200, give:[['b63',1]]},
   {key:'b61', tab:'fun', name:'Roda Roulette', desc:'Pukul untuk memutar roda 0–36 (merah/hitam/hijau). Hasilnya dilihat semua orang', price:400, give:[['b61',1]]},
 ];
 const SLOT_NAME = {wings:'Sayap', hat:'Topi', shirt:'Baju', pants:'Celana', tool:'Alat'};
@@ -383,6 +387,11 @@ function makeTex(id, v){
       px(g,2,2,'#17121c',8,11); px(g,3,3,'#bfe6ff',6,9); px(g,3,3,'#e8f8ff',2,9);
       for (const y of [5,8,11]) px(g,3,y,'#7aa6c8',6,1);
       px(g,11,3,'#17121c',3,3); px(g,12,4,'#ffd74a',1,1); px(g,11,8,'#ffd74a',3,1); px(g,11,10,'#ff5a5a',3,1);
+      break; }
+    case 63: {   // papan catur 16px: meja kayu + kotak 4x4 + bidak
+      px(g,0,0,'#17121c',16,16); px(g,1,1,P[1],14,14);
+      for (let r=0;r<4;r++) for (let c=0;c<4;c++) px(g,2+c*3,2+r*3,(r+c)%2 ? '#8a5a2b' : '#f4e2c0',3,3);
+      px(g,3,3,'#17121c',1,2); px(g,12,12,'#ffffff',1,2); px(g,6,12,'#ffffff',1,2);
       break; }
     case 60: {   // dadu: kubus putih dengan titik
       px(g,0,0,'#17121c',16,16); px(g,1,1,P[0],14,14); px(g,1,1,P[2],14,1); px(g,1,1,P[2],1,14);
