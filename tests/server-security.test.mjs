@@ -72,6 +72,12 @@ drain(a); await hitN(a, at(47, 29), 1); o = await tileAfter(a, at(47, 29), 400);
 // 12. pakaian palsu dibuang dari state
 drain(b); S(a, {t: 'pos', s: {x: 50 * 32 + 3, y: 29 * 32 + 2, worn: {hat: 'h_cowboy', evil: {a: 1}, wings: {x: 1}}}}); const pb = await wait(b, 'pos');
 ok('pakaian yang tidak dimiliki / rusak dibuang', pb && JSON.stringify(pb.s.worn) === '{}', JSON.stringify(pb && pb.s.worn));
+// v1.13: respawn ke pintu utama dari tempat jauh tidak boleh dikembalikan server ke tempat mati
+{ posAt(a, 50, 29); await sleep(250); for (let x = 52; x <= 92; x += 2){ posAt(a, x, 28); await sleep(70); } await sleep(40); drain(a);
+  S(a, {t: 'pos', s: {x: 50 * 32 + 3, y: 29 * 32 + 2 - 70, vx: 0, vy: 0, f: 1, g: false, held: 'fist', worn: {}, rs: 1}}); const tp = await wait(a, 'tp', 600);
+  ok('respawn dari jauh ke pintu utama diterima server', !tp, tp ? JSON.stringify(tp) : '');
+  drain(a); S(a, {t: 'pos', s: {x: 10 * 32 + 3, y: 20 * 32 + 2, vx: 0, vy: 0, f: 1, g: false, held: 'fist', worn: {}, rs: 1}}); const tp2 = await wait(a, 'tp', 600);
+  ok('tanda respawn palsu (bukan di pintu utama) tetap ditolak', !!tp2); posAt(a, 50, 29); await sleep(300); }
 // v1.10: kacamata (slot face) yang dimiliki terlihat oleh pemain lain
 S(a, {t: 'chat', text: '/testgive gem 500'}); await sleep(100); S(a, {t: 'buy', key: 'f_monog'}); await sleep(200);
 drain(b); S(a, {t: 'pos', s: {x: 50 * 32 + 3, y: 29 * 32 + 2, worn: {face: 'f_monog'}}}); const pf = await wait(b, 'pos');

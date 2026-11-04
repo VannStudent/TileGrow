@@ -116,7 +116,7 @@ function netEnterWorld(name, data, drops){
   worldName = name; restoreWorld(data); worlds = {[name]: data};
   for (const d of drops || []) addServerDrop(d, true);
   net.players.clear(); net.dirty.clear(); net.pending.clear();
-  respawn(); pushHistory(name); inGame = true; net.joining = null;
+  respawn(); pushHistory(name); inGame = true; net.joining = null; net.wauth = null; netSend({t: 'wmodInfo'});
   chat.length = 0; say('sys', 'Masuk ke world ' + name + ' (online).');
   closeModals(); showScreen('game'); refreshUI(); netSavePlayer();
 }
@@ -190,7 +190,12 @@ function netOnMessage(m){
     }
     case 'err': $('lbErr') && ($('lbErr').textContent = m.text); toast(m.text); net.joining = null; return;
     case 'kicked': netKickReason = m.reason; return;
-    case 'left': return;
+    case 'left':                                          // v1.13: dikeluarkan / di-ban dari world oleh owner/admin world
+      if (!m.reason) return;
+      net.joining = null; $('lbHint') && ($('lbHint').textContent = '');
+      if (inGame){ inGame = false; net.players.clear(); closeModals(); showScreen('lobby'); netRequestWorlds(); }
+      return;
+    case 'wmodInfo': net.wauth = m.auth || null; net.wbans = m.bans || []; if (typeof refreshPlayerMenu === 'function') refreshPlayerMenu(); return;
     // ----- v1.3 -----
     case 'econ': applyEcon(m); if (typeof vendOpen !== 'undefined' && vendOpen !== null) renderVend(); return;
     case 'dropAdd': return addServerDrop(m.d);
@@ -309,6 +314,7 @@ function netTick(dt){
   const s = {x: Math.round(pl.x*10)/10, y: Math.round(pl.y*10)/10, vx: Math.round(pl.vx), vy: Math.round(pl.vy), f: pl.face, g: pl.onGround,
     sw: Math.round(pl.swing*100)/100, sa: Math.round(pl.swingAng*100)/100, fl: Math.round(pl.flap*100)/100, dead: Math.round(pl.dead*10)/10,
     an: Math.round(pl.angel*10)/10, held: selected().key, worn};
+  if (pl.rs){ s.rs = 1; pl.rs = 0; }                  // v1.13: tanda respawn (sekali)
   const key = JSON.stringify(s);
   if (key === net.lastSent && net.sendT < 1) return;
   net.sendT = 0; net.lastSent = key;

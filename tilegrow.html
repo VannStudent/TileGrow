@@ -599,6 +599,97 @@
   .iiFacts{display:grid;gap:4px;margin-bottom:10px}
   .iiFacts div{display:flex;justify-content:space-between;gap:10px;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.06);font-size:12px}
   .iiFacts span{color:#9fb3d1} .iiFacts b{text-align:right}
+
+  /* ===== v1.13 UI ala Growtopia (toko + world lobby): panel teal datar, bingkai cyan tebal bergaris gelap,
+     kartu = jendela gambar gelap di dalam "nampan" cyan, harga di bilah bawah dengan permata merah,
+     teks putih tebal dengan bayangan keras (tanpa blur). Gaya ditiru dari screenshot toko Growtopia; gambar & ikon buatan sendiri. ===== */
+  :root{--gtTeal:#2b6f8f;--gtTealD:#225a75;--gtCyan:#55c6f2;--gtCyanL:#7ad6f7;--gtCyanD:#3aa8d8;--gtOl:#173847;--gtWin:#3c7daa;--gtWinOl:#1e4a60;--gtTxtSh:#1b2f3a}
+  .gtTxt,.shopWin h2,.shopWin b,.wlobby b,.wlTitle,.wlSec{text-shadow:2px 2px 0 var(--gtTxtSh)}
+  /* --- toko --- */
+  .shopWin{width:min(860px,97vw);background:var(--gtTeal);border:4px solid var(--gtOl);border-radius:10px;box-shadow:0 0 0 4px var(--gtCyan) inset,0 8px 0 rgba(0,0,0,.35);padding:12px 14px 14px}
+  .shopWin h2{background:var(--gtCyanD);margin:-4px -6px 10px;padding:8px 10px;border:3px solid var(--gtOl);border-radius:8px;font-size:22px;color:#fff;
+    box-shadow:0 -3px 0 rgba(0,0,0,.18) inset}
+  .shopWin h2 .btn{background:#9ec3d3;color:#173847;border:2px solid #3a6273;box-shadow:3px 3px 0 #4e7a8c;text-shadow:none;font-weight:900}
+  .shopGem{background:rgba(0,0,0,.28);border:2px solid var(--gtOl);border-radius:99px;padding:3px 12px 3px 6px;font-size:17px}
+  .shopGem img{width:22px;height:22px}
+  .shopWin .scroll{background:var(--gtTealD);border:3px solid var(--gtOl);border-radius:8px;padding:10px;max-height:56vh;scrollbar-color:var(--gtCyan) transparent}
+  .scathead{background:var(--gtCyanD)!important;border-color:var(--gtOl)}
+  .scards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .scard{padding:6px 6px 0;gap:0;border:3px solid var(--gtOl);border-radius:12px;background:var(--gtCyan);box-shadow:0 -3px 0 var(--gtCyanL) inset,0 4px 0 rgba(0,0,0,.3);overflow:visible}
+  .scard .art{position:relative;height:92px;border-radius:8px;border:3px solid var(--gtWinOl);background:var(--gtWin);overflow:hidden;
+    flex-direction:column;justify-content:flex-start;padding-top:6px}
+  .scard .art::before{content:'';position:absolute;inset:-40%;background:repeating-conic-gradient(from 0deg,rgba(255,255,255,.08) 0 12deg,transparent 12deg 30deg);pointer-events:none}
+  .scard .art .wm{position:absolute;right:-14px;bottom:-14px;width:84px;height:84px;opacity:.22;image-rendering:pixelated;filter:grayscale(.3)}
+  .scard .art img.ic{position:relative;width:46px;height:46px;margin-top:auto;margin-bottom:6px;image-rendering:pixelated;filter:drop-shadow(0 3px 0 rgba(0,0,0,.4))}
+  .scard .art .nm{position:relative;font-size:12.5px;font-weight:900;color:#fff;text-align:center;line-height:1.15;padding:0 4px;text-shadow:2px 2px 0 var(--gtTxtSh)}
+  .scard b{display:none}
+  .scard .pr{width:calc(100% + 12px);margin:0 -6px;justify-content:center;gap:6px;padding:7px 0 8px;font-size:17px;color:#fff;text-shadow:2px 2px 0 #1f6f93}
+  .scard .pr img{width:22px;height:22px;margin-top:-10px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.35))}
+  .scard.poor .pr{color:#ffd0d0}
+  .scard.on{box-shadow:0 0 0 3px #ffe14a,0 -3px 0 var(--gtCyanL) inset,0 4px 0 rgba(0,0,0,.3)}
+  .scard .rar{z-index:2}
+  .scard .own,.scard .rar{top:10px}
+  .scard:hover{transform:translateY(-2px);filter:brightness(1.06)}
+  .scard:active{transform:translateY(2px);box-shadow:0 -3px 0 var(--gtCyanL) inset,0 1px 0 rgba(0,0,0,.3)}
+  .scat{border-color:var(--gtOl)!important;border-radius:12px;box-shadow:0 0 0 3px var(--gtCyan) inset,0 4px 0 rgba(0,0,0,.3)}
+  .sbanner{border-color:var(--gtOl);box-shadow:0 0 0 3px var(--gtCyan) inset,0 4px 0 rgba(0,0,0,.3)}
+  .shopFoot{background:var(--gtTealD);border:3px solid var(--gtOl);border-radius:8px;padding:8px}
+  .shopInfo{background:var(--gtWin);border:3px solid var(--gtWinOl);color:#fff;font-size:13px;text-shadow:1px 1px 0 var(--gtTxtSh)}
+  .shopInfo span{color:#e4ecef}
+  .shopBtns .btn{border:3px solid var(--gtOl);border-radius:10px;font-weight:900;font-size:15px;text-shadow:2px 2px 0 rgba(0,0,0,.35);box-shadow:0 4px 0 rgba(0,0,0,.35)}
+  #shopBuy{background:#5bc236;color:#fff;box-shadow:0 -4px 0 #3a8a1e inset,0 4px 0 rgba(0,0,0,.35)}
+  #shopBuy:disabled{background:#8a9aa3;box-shadow:0 -4px 0 #6b7a82 inset;opacity:.85}
+  #shopBack{background:#9ec3d3;color:#173847;text-shadow:none}
+  /* --- world lobby --- */
+  .lobbyScr{background:radial-gradient(ellipse at 50% 30%,rgba(43,111,143,.25),rgba(10,30,45,.6));backdrop-filter:blur(3px)}
+  .wlobby{background:var(--gtTeal)!important;border:4px solid var(--gtOl)!important;border-radius:10px!important;box-shadow:0 0 0 4px var(--gtCyan) inset,0 8px 0 rgba(0,0,0,.35)!important}
+  .wlTop{background:var(--gtCyanD);margin:-8px -10px 0;padding:8px 12px;border:3px solid var(--gtOl);border-radius:8px}
+  .wlLogo{color:#ffe14a}
+  .wlAcct{background:rgba(0,0,0,.25);border-color:var(--gtOl)}
+  .wlMsg{color:#e4ecef;text-shadow:1px 1px 0 var(--gtTxtSh)}
+  .wlSearch{border:3px solid var(--gtOl);background:#fff;box-shadow:0 4px 0 rgba(0,0,0,.3);border-radius:10px}
+  .wlSearch:focus-within{border-color:var(--gtOl);box-shadow:0 0 0 3px #ffe14a,0 4px 0 rgba(0,0,0,.3)}
+  .wlSearch input{color:#173847}
+  .wlSearch input::placeholder{color:#6b8796}
+  .wlGo{background:#5bc236!important;border-left:3px solid var(--gtOl);box-shadow:0 -4px 0 #3a8a1e inset;text-shadow:2px 2px 0 rgba(0,0,0,.35)}
+  .wlHint{color:#e4ecef}
+  .wlFilter{border-top:3px solid var(--gtOl)}
+  .wlTabs{background:var(--gtOl);border-color:var(--gtOl)}
+  .lbtab{color:#bfd9e4}
+  .lbtab.on{background:var(--gtCyan);color:#173847;text-shadow:none}
+  .wlWorlds{background:var(--gtTealD);border:3px solid var(--gtOl);border-radius:8px;padding:10px;margin:0;scrollbar-color:var(--gtCyan) transparent}
+  .wlWorlds .empty{color:#e4ecef;border-color:var(--gtCyan)}
+  .wbtn{border:3px solid var(--gtOl);border-radius:12px;padding:6px 6px 0;gap:0;background:var(--gtCyan)!important;box-shadow:0 -3px 0 var(--gtCyanL) inset,0 4px 0 rgba(0,0,0,.3)}
+  .wbtn .wTop{flex-direction:column;align-items:stretch;gap:0;background:var(--gtWin);border:3px solid var(--gtWinOl);border-radius:8px;overflow:hidden}
+  .wbtn .wArt{width:100%;height:58px;border:0;border-radius:0;border-bottom:3px solid var(--gtWinOl)}
+  .wbtn .wName{padding:4px 6px 5px;font-size:15px;text-align:center;text-shadow:2px 2px 0 var(--gtTxtSh)}
+  .wbtn .wMeta{justify-content:center;padding:6px 2px 7px;width:100%;color:#173847;font-weight:800}
+  .wbtn .wOn{color:#1d6b2a}
+  .wbtn.own .wBadge{background:#5bc236;color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.35)}
+  .wbtn.hist .wBadge{background:#ffe14a;color:#5a3a00}
+  .wbtn.other .wBadge{background:#e4ecef;color:#173847}
+  .wbtn.sel{box-shadow:0 0 0 3px #ffe14a,0 -3px 0 var(--gtCyanL) inset,0 4px 0 rgba(0,0,0,.3)!important}
+
+  /* v1.13 perbaikan setelah cek visual */
+  #shop{background:rgba(6,20,30,.66)}
+  .scard .art .wm{display:none}
+  .scard .art{height:104px;padding-top:20px}
+  .scard .art img.ic{width:54px;height:54px;margin-bottom:8px}
+  .scard .rar{left:10px;top:9px;font-size:9px;padding:1px 5px;border:2px solid var(--gtOl);box-shadow:1px 1px 0 var(--gtOl)}
+  .scard .own{left:auto;right:10px;top:9px;font-size:9px;border:2px solid var(--gtOl)}
+  .scard .pr{border-top:3px solid var(--gtOl);margin-top:6px;background:var(--gtCyan);border-radius:0 0 9px 9px}
+  .scard .pr img{margin-top:0;filter:drop-shadow(1px 1px 0 var(--gtOl)) drop-shadow(-1px -1px 0 var(--gtOl))}
+  .scat,.sbanner{box-shadow:0 0 0 3px var(--gtCyan) inset,0 -6px 0 rgba(0,0,0,.18) inset,0 4px 0 rgba(0,0,0,.3)}
+  .scat b,.sbt b{text-shadow:2px 2px 0 var(--gtTxtSh)}
+  .scat span{font-size:12px}
+  .sbt .sp{background:rgba(0,0,0,.3);border:2px solid var(--gtOl);border-radius:99px;padding:2px 10px;width:max-content;font-size:16px}
+  .shopWin .scroll{max-height:60vh}
+  #shopBuy:disabled{background:#6f9a5c;box-shadow:0 -4px 0 #4f7340 inset;opacity:.6;color:#e8f3e2}
+  .wlSearch{background:#e8f6fc}
+  .wlMsg span{color:#cfe8f3!important}
+  .wlLogout{border:2px solid var(--gtOl);background:#9ec3d3;color:#173847;border-radius:10px;box-shadow:2px 2px 0 var(--gtOl)}
+  .wlNews{border:2px solid var(--gtOl)!important;border-radius:10px!important;box-shadow:2px 2px 0 var(--gtOl)}
+  .lbtab{color:#e4ecef}
 </style>
 </head>
 <body>
@@ -733,6 +824,12 @@
       <button class="btn" id="pmFriend">👥 Tambah Teman</button>
       <button class="btn warn" id="pmReport">🚩 Report</button>
     </div>
+    <div id="pmWorld" style="display:none"><label>Otoritas world</label><div class="menuBtns">
+      <button class="btn" id="pmPull">🧲 Tarik</button>
+      <button class="btn warn" id="pmKick">👢 Kick</button>
+      <button class="btn warn" id="pmBan">⛔ Ban 1 jam</button>
+    </div></div>
+    <p class="note" id="pmWNote" style="margin:6px 0 0"></p>
   </div></div>
   <div class="modal hidden" id="friendsM"><div class="win card" style="width:min(440px,94vw)">
     <h2>👥 Teman <button class="btn x">Tutup</button></h2>
@@ -807,7 +904,7 @@
       <button class="tBtn" id="tOptions">Opsi</button>
       <button class="tBtn" id="tAbout">Tentang</button>
     </div>
-    <div class="tVer">v1.12</div>
+    <div class="tVer">v1.13</div>
     <button class="tMusic" id="tMusic" title="Musik">♪</button>
   </div>
 

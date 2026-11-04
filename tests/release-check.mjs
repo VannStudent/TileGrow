@@ -96,7 +96,7 @@ else {
 // ---------- 5. suite tes ----------
 if (!fast){
   console.log('\n[5] Tes otomatis (beberapa menit)');
-  for (const s of ['', 'security', 'admin', 'v14']){
+  for (const s of ['', 'security', 'admin', 'v14', 'world']){
     const r = spawnSync(process.execPath, [path.join(root, 'tests/run-v13.mjs'), ...(s ? [s] : [])], {encoding: 'utf8', env: {...process.env, TG_TMP: tmpBase}, timeout: 300000, stdio: ['ignore', 'pipe', 'pipe']});
     const out = (r.stdout || '') + (r.stderr || ''), sum = (out.match(/(\d+) lulus, (\d+) gagal/) || []);
     const fails = out.split('\n').filter(l => l.startsWith('FAIL')).slice(0, 5).join(' | ');

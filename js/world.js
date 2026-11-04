@@ -92,7 +92,11 @@ function newPlayer(){
 function respawn(msg){
   const keepFace = pl ? pl.face : 1;
   newPlayer(); pl.face = keepFace;
-  if (msg){ pl.angel = 1.6; pl.y -= TS*2.2; pl.vy = 0; }   // efek malaikat: turun dari atas pintu utama
+  // efek malaikat: turun dari atas pintu utama. v1.13: hanya setinggi ruang kosong di atas pintu
+  // (dulu selalu 2,2 block -> kalau ada atap/block di atas pintu, karakter tersangkut dan bisa jatuh ke samping)
+  if (msg){ let up = 0; while (up < 2 && !hitsSolid(pl.x, pl.y - (up + 1) * TS * 1.1, pl.w, pl.h)) up++;
+    pl.angel = up ? 1.6 : .8; pl.y -= up * TS * 1.1; pl.vy = 0; }
+  pl.rs = 1;                                                // paket posisi berikut = respawn (server mengizinkan pindah instan ke pintu utama)
   camX = pl.x - VW/zoom/2; cam = pl.y - VH/zoom/2; clampCam();
   if (msg) toast(msg);
 }

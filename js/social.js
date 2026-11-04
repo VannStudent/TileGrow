@@ -13,7 +13,21 @@ function openPlayerMenu(r){
   $('pmFriend').disabled = isFriend;
   $('pmTrade').disabled = !!net.trade;
   netSend({t: 'profile', name: r.name});
+  netSend({t: 'wmodInfo'});                               // v1.13: apakah aku owner/admin world ini?
+  refreshPlayerMenu();
   openModal('playerM');
+}
+// v1.13: tombol Tarik/Kick/Ban hanya muncul untuk owner/admin world; staff server & owner world tidak bisa ditindak
+function refreshPlayerMenu(){
+  const r = menuTarget, box = $('pmWorld'); if (!box) return;
+  const staff = r && ['mod', 'dev', 'owner'].includes(r.role);
+  const wl = typeof worldLock === 'function' ? worldLock() : null;
+  const tOwner = wl && wl.lock && String(wl.lock.owner).toLowerCase() === String(r && r.name).toLowerCase();
+  const tAdmin = wl && wl.lock && (wl.lock.access || []).some(n => String(n).toLowerCase() === String(r && r.name).toLowerCase());
+  const can = r && net.wauth && !staff && !tOwner && !(tAdmin && net.wauth !== 'owner');
+  box.style.display = can ? '' : 'none';
+  $('pmWNote').textContent = !r || !net.wauth ? '' : staff ? 'Staff server tidak bisa ditindak.' : tOwner ? 'Owner world tidak bisa ditindak.'
+    : (tAdmin && net.wauth !== 'owner') ? 'Admin lain hanya bisa ditindak owner world.' : '';
 }
 function showPlayerProfile(m){
   if (!menuTarget || menuTarget.name !== m.name) return;
@@ -105,6 +119,11 @@ function bindSocial(){
   $('pmTrade').onclick = ()=>{ if (!menuTarget) return; netSend({t: 'tradeReq', name: menuTarget.name}); closeModals(); };
   $('pmFriend').onclick = ()=>{ if (!menuTarget) return; netSend({t: net.freqs.includes(menuTarget.name) ? 'friendAccept' : 'friendReq', name: menuTarget.name}); closeModals(); };
   $('pmReport').onclick = ()=>{ if (!menuTarget) return; openReport(menuTarget); };
+  $('pmPull').onclick = ()=>{ if (!menuTarget) return; netSend({t: 'wmod', op: 'pull', name: menuTarget.name}); closeModals(); };
+  $('pmKick').onclick = ()=>{ if (!menuTarget) return; netSend({t: 'wmod', op: 'kick', name: menuTarget.name}); closeModals(); };
+  $('pmBan').onclick = ()=>{ if (!menuTarget) return;
+    if (!confirm('Ban ' + menuTarget.display + ' dari world ini selama 1 jam?')) return;
+    netSend({t: 'wmod', op: 'ban', name: menuTarget.name}); closeModals(); };
   document.querySelectorAll('#reportM .rr').forEach(b => b.onclick = ()=>{ document.querySelectorAll('#reportM .rr').forEach(x => x.classList.remove('on')); b.classList.add('on'); });
   $('rpSend').onclick = ()=>{
     const reason = (document.querySelector('#reportM .rr.on') || {}).dataset.r || 'lainnya';

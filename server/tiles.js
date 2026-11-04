@@ -51,6 +51,10 @@ function checkMove(c, w, s){
   const now = Date.now(), last = c.lastPos;
   if (c.frozen && last) return false;
   if (insideSolid(w.data, s.x, s.y, c.user)) return false;
+  // v1.13: respawn = pindah instan ke pintu utama dari mana saja. Hanya diterima kalau tujuannya memang pintu utama
+  // (sampai 3 tile di atasnya, untuk efek malaikat). Dulu ditolak sebagai teleport -> pemain dikembalikan ke tempat mati.
+  if (s.rs){ const sp = w.data.spawn, dx = s.x - (sp.x * TS + 3), dy = s.y - (sp.y * TS + 2);
+    return Math.abs(dx) <= 4 && dy <= 4 && dy >= -TS * 3 - 4; }
   if (last){
     const dt = Math.max(.05, (now - last.t) / 1000), dist = Math.hypot(s.x - last.x, s.y - last.y);
     if (dist > MAX_SPEED * dt + TS * 2) return false;
@@ -197,7 +201,7 @@ function handleAct(c, m){
     if (om.lock){
       if (om.lock.owner !== u) return deny(c, w, i, 'Hanya pemilik lock.');
       const L = mt.lock; if (!L || L.type !== om.lock.type || L.owner !== om.lock.owner) return deny(c, w, i, 'Lock tidak boleh pindah tangan.');
-      L.access = L.access.filter(n => isName(n) && n !== u).slice(0, 50);
+      L.access = [...new Set(L.access.filter(n => isName(n) && n !== u))].slice(0, 1000);   // v1.13: admin world tak terbatas (batas teknis 1000)
       L.tiles = L.type === 'world' ? null : claimTilesS(d, meta, i, L.type, !!L.ignoreAir);
     } else if (!can) return deny(c, w, i, 'Area ini dikunci.');
     if (om.display){

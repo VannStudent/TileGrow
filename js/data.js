@@ -79,9 +79,9 @@ const T = {
 // ===== WEARABLES (pakaian) =====
 // slot: wings (sayap, lompat ekstra), hat (topi), hair (rambut, v1.8), shirt (baju), pants (celana)
 const WINGS = {
-  devil: {key:'w_devil', slot:'wings', name:'Devil Wings', price:1200, jumps:2, color:['#c6304a','#7a1526','#ff7a8f'], desc:'Sayap iblis. Lompat 2 kali'},
-  angel: {key:'w_angel', slot:'wings', name:'Angel Wings', price:1200, jumps:2, color:['#f2f6ff','#b9c6de','#ffffff'], desc:'Sayap malaikat. Lompat 2 kali'},
-  storm: {key:'w_storm', slot:'wings', name:'Storm Wings', price:1200, jumps:2, color:['#6fd0f5','#2d6c8a','#d8f4ff'], desc:'Sayap badai. Lompat 2 kali'}
+  devil: {key:'w_devil', slot:'wings', name:'Devil Wings', price:6000, jumps:2, color:['#c6304a','#7a1526','#ff7a8f'], desc:'Sayap iblis. Lompat 2 kali'},
+  angel: {key:'w_angel', slot:'wings', name:'Angel Wings', price:8000, jumps:2, color:['#f2f6ff','#b9c6de','#ffffff'], desc:'Sayap malaikat. Lompat 2 kali'},
+  storm: {key:'w_storm', slot:'wings', name:'Storm Wings', price:10000, jumps:2, color:['#6fd0f5','#2d6c8a','#d8f4ff'], desc:'Sayap badai. Lompat 2 kali'}
 };
 // pakaian lain murni kosmetik
 const CLOTHES = {

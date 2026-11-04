@@ -321,7 +321,7 @@ function renderShop(){
     el.style.setProperty('--c1', cat.color[0]); el.style.setProperty('--c2', cat.color[1]);
     const rk = it.give.length === 1 ? rarityOf(it.give[0][0]) : null;
     el.innerHTML = (owned ? '<span class="own">PUNYA</span>' : '') + (rk && rk !== 'common' ? '<span class="rar" style="background:' + RARITY[rk].color + '">' + RARITY[rk].name + '</span>' : '') +
-      '<div class="art"><img src="' + icon(shopIconOf(it)) + '"></div><b>' + esc(it.name) + '</b>' +
+      '<div class="art"><img class="wm" src="' + icon(shopIconOf(it)) + '"><span class="nm">' + esc(it.name) + '</span><img class="ic" src="' + icon(shopIconOf(it)) + '"></div><b>' + esc(it.name) + '</b>' +
       '<span class="pr"><img src="' + icon('gem') + '">' + (maxed ? 'Maks' : price.toLocaleString('id-ID')) + '</span>';
     el.onclick = ()=>{ shopSel = it; renderShop(); };
     el.ondblclick = ()=>{ shopSel = it; buy(it); };

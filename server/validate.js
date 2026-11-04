@@ -35,7 +35,7 @@ function validMeta(f, i, mt){
     && (v.per === undefined || v.per === 'item' || v.per === 'wl') && (v.cur === undefined || v.cur === 'wl')
     && (v.gemsOld === undefined || (Number.isInteger(v.gemsOld) && v.gemsOld >= 0));
   // lock
-  if (v.type !== LOCK_TYPE[f] || !isName(v.owner) || !Array.isArray(v.access) || v.access.length > 50 || !v.access.every(a => isStr(a, 16))
+  if (v.type !== LOCK_TYPE[f] || !isName(v.owner) || !Array.isArray(v.access) || v.access.length > 1000 || !v.access.every(a => isStr(a, 16))
       || typeof v.public !== 'boolean' || (v.ignoreAir !== undefined && typeof v.ignoreAir !== 'boolean')) return false;
   if (v.tiles === null || v.tiles === undefined) return true;
   if (v.type === 'world' || !Array.isArray(v.tiles) || v.tiles.length > LOCK_TILES[v.type]) return false;

@@ -61,11 +61,12 @@ function refreshVisibility(c){
 function kickClient(o, reason){ o.send({t: 'kicked', reason}); leaveWorld(o); o.user = null; setTimeout(() => o.close(), 50); }
 
 // ---------- modul aksi (dibuat dengan konteks bersama; social/news diisi setelah dibuat di bawah) ----------
-const ctx = {...store, clients, inWorld, broadcast, findOnline, visibleTo, kickClient, isLocalIp};
+const ctx = {...store, clients, inWorld, broadcast, findOnline, visibleTo, kickClient, isLocalIp, leaveWorld, TS};
 Object.assign(ctx, require('./tiles')(ctx));
 Object.assign(ctx, require('./machines')(ctx));
 Object.assign(ctx, require('./chatcmd')(ctx));
 Object.assign(ctx, require('./auth')(ctx));
+Object.assign(ctx, require('./worldmod')(ctx));                  // v1.13: owner/admin world: pull, kick, ban
 const {spawnDropS, checkMove, handleAct, handleChess, handleVend, emoteCmd, broadcastCmd, privateMsg, handleAuth} = ctx;
 
 // ---------- modul sosial ----------
@@ -114,12 +115,16 @@ function handle(c, m){
         worlds.set(name, w); writeJSON(worldFile(name), w.data);
         console.log('[world] dibuat', name, 'oleh', c.user);
       }
+      const wd = ctx.wmod.joinDenied(c, w);                     // v1.13: ban world 1 jam
+      if (wd){ c.send({t: 'note', text: wd}); return c.send({t: 'left', reason: 'wban'}); }
       return enterWorld(c, w);
     }
     case 'create': return handle(c, {...m, t: 'join'});   // klien lama
     case 'leave': leaveWorld(c); return c.send({t: 'left'});
     case 'act': return handleAct(c, m);
     case 'vend': return handleVend(c, m);
+    case 'wmod': return ctx.wmod.handle(c, m);
+    case 'wmodInfo': return c.send({t: 'wmodInfo', ...ctx.wmod.info(c)});
     case 'chess': return handleChess(c, m);
     case 'ops': return c.send({t: 'err', text: 'Versi game lama. Muat ulang halaman (Ctrl+F5).'});
     case 'pos': {
@@ -127,7 +132,7 @@ function handle(c, m){
       const w = worlds.get(c.world); if (!w) return;
       const s = m.s, num = v => typeof v === 'number' && isFinite(v) ? v : 0;
       const st = {x: num(s.x), y: num(s.y), vx: num(s.vx), vy: num(s.vy), f: s.f < 0 ? -1 : 1, g: !!s.g, sw: num(s.sw), sa: num(s.sa),
-                 fl: num(s.fl), dead: num(s.dead), an: num(s.an), held: typeof s.held === 'string' ? s.held.slice(0, 24) : 'fist',
+                 fl: num(s.fl), dead: num(s.dead), an: num(s.an), rs: s.rs ? 1 : 0, held: typeof s.held === 'string' ? s.held.slice(0, 24) : 'fist',
                  worn: cleanWornS(s.worn)};
       // pakaian hanya boleh yang benar-benar ada di tas
       const E = econOf(c.user);
