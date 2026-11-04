@@ -54,7 +54,7 @@ ok('/items mencari kode item', /b30 = World Lock/.test(t) && /b34 = Crystal Lock
 
 // ---------- 2. harga World Lock + Crystal Lock ----------
 drain(p1); S(p1, {t: 'buy', key: 'b30'}); e = await lastEcon(p1);
-ok('World Lock seharga 1.800 gems', e && e.gems === 5050 - 1800 && cnt(e, 'b30') === 4, 'gems ' + (e && e.gems));
+ok('World Lock seharga 4.500 gems (v1.12)', e && e.gems === 5050 - 4500 && cnt(e, 'b30') === 4, 'gems ' + (e && e.gems));
 S(p1, {t: 'lockConvert', key: 'b30'}); nt = await wait(p1, 'note', 800);
 ok('Gabung < 100 World Lock ditolak', nt && /Butuh 100 World Lock/.test(nt.text), nt && nt.text);
 S(dev, {t: 'chat', text: '/give item pemain b30 96'}); await staffMsg(dev); await lastEcon(p1);
@@ -92,7 +92,7 @@ for (let k = 0; k < 6; k++){ S(p1, {t: 'act', a: 'hit', i: at(47, 29)}); await s
 op = await wait(p1, 'ops', 900, m => m.ops && m.ops.some(o => o[0] === at(47, 29) && o[1] === 0));
 ok('Pemilik bisa memecah Dadu (pukul beruntun)', !!op);
 
-// ---------- 4. gems farmable 50–1000 ----------
+// ---------- 4. gems farmable (v1.12: 25–500) ----------
 const farmTest = async (id, lo, hi) => {
   S(dev, {t: 'chat', text: '/give item devi b' + id + ' 1'}); await staffMsg(dev); await lastEcon(dev);
   S(dev, {t: 'join', name: 'FARM' + id, world}); await wait(dev, 'world'); posAt(dev, 50, 29); await sleep(120); drain(dev);
@@ -101,9 +101,9 @@ const farmTest = async (id, lo, hi) => {
   let g = 0, x; while ((x = await wait(dev, 'dropAdd', 500))) if (x.d.key === 'gem') g += x.d.n;
   return g;
 };
-const g50 = await farmTest(50, 50, 150), g54 = await farmTest(54, 500, 1000);
-ok('Semak Permata dipecah: 50–150 gems', g50 >= 50 && g50 <= 150, g50 + ' gems');
-ok('Bunga Pelangi dipecah: 500–1000 gems', g54 >= 500 && g54 <= 1000, g54 + ' gems');
+const g50 = await farmTest(50, 25, 75), g54 = await farmTest(54, 250, 500);
+ok('Semak Permata dipecah: 25–75 gems', g50 >= 25 && g50 <= 75, g50 + ' gems');
+ok('Bunga Pelangi dipecah: 250–500 gems', g54 >= 250 && g54 <= 500, g54 + ' gems');
 
 
 // ---------- 5. Vending Machine ----------

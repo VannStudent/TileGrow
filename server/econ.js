@@ -27,7 +27,7 @@ function loadEcon(root){
     var __gen = () => { genTerrain(); return {fg: Array.from(fg), bgw: Array.from(bgw), trees: Array.from(trees.entries()),
                                                meta: Array.from(meta.entries()), spawn: {x: spawn.x, y: spawn.y}}; };
   `, ctx);
-  const D = vm.runInContext(`({SHOP, BY_ID, RECIPES, GROW_MS, SEEDABLE, DROP_BLOCK, DROP_SEED, DROP_SEED_BG, GEM_FROM_BLOCK,
+  const D = vm.runInContext(`({SHOP, BY_ID, RECIPES, GROW_MS, SEEDABLE, DROP_BLOCK, DROP_SEED, DROP_SEED_BG, DROP_SEED_FARM, HARVEST_SEED, HARVEST_SEED_FARM, GEM_FROM_BLOCK,
     GEM_FROM_TREE, WEAR, STACK, FIST, WRENCH, REACH, TS, COLS, ROWS, itemDef, recipe, xpNeeded})`, ctx);
   const G = vm.runInContext(`({addItem, takeItem, countOf, canAdd, questEvent, addXP, stat, claimQuest, rollQuests,
     discoverRecipe, bagUpgradeCost, checkGoals, convertLocks, addGems: d => { gems += d; }})`, ctx);
@@ -50,7 +50,7 @@ function loadEcon(root){
     if (d.lock || d.wrench) drops.push(['b' + id, 1]);           // lock, papan, pintu, kotak pajang selalu kembali
     else {
       if (R() < D.DROP_BLOCK) drops.push(['b' + id, 1]);
-      if (D.SEEDABLE.includes(id) && R() < D.DROP_SEED) drops.push(['s' + id, 1]);
+      if (D.SEEDABLE.includes(id) && R() < (d.farm ? D.DROP_SEED_FARM : D.DROP_SEED)) drops.push(['s' + id, 1]);
     }
     let ore = false;
     if (d.gem){ drops.push(['gem', d.gem[0] + (R() * (d.gem[1] - d.gem[0] + 1) | 0)]); ore = !d.farm; }
@@ -60,7 +60,7 @@ function loadEcon(root){
   // panen pohon (sama dengan punch() di game.js)
   function rollHarvest(kind){
     const drops = [['b' + kind, 1 + (R() * 3 | 0)]];
-    if (R() < .5) drops.push(['s' + kind, 1]);
+    if (R() < (D.BY_ID[kind].farm ? D.HARVEST_SEED_FARM : D.HARVEST_SEED)) drops.push(['s' + kind, 1]);
     drops.push(['gem', D.GEM_FROM_TREE[0] + (R() * (D.GEM_FROM_TREE[1] - D.GEM_FROM_TREE[0] + 1) | 0)]);
     return {drops, xp: 3 + (D.BY_ID[kind].xp || 1) * 2};
   }

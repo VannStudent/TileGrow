@@ -315,7 +315,7 @@ function punch(tx,ty){
     if (Date.now() - tr.t0 < GROW_MS[tr.kind]) return toast('Pohon belum siap dipanen.');
     trees.delete(i); fg[i] = 0; netTouch(i); puff(tx,ty,4,10); sfx('break');
     spawnDrop(tx,ty,'b'+tr.kind, 1 + (Math.random()*3|0));
-    if (Math.random() < .5) spawnDrop(tx,ty,'s'+tr.kind,1);
+    if (Math.random() < (BY_ID[tr.kind].farm ? HARVEST_SEED_FARM : HARVEST_SEED)) spawnDrop(tx,ty,'s'+tr.kind,1);
     const g = GEM_FROM_TREE[0] + (Math.random()*(GEM_FROM_TREE[1]-GEM_FROM_TREE[0]+1)|0);
     for (let k=0;k<g;k++) spawnDrop(tx,ty,'gem',1);
     stat('harvested',1); questEvent('harvest',null,1); addXP(3 + (BY_ID[tr.kind].xp||1)*2);
@@ -342,7 +342,7 @@ function hitTile(tx,ty,id,isBg){
   else if (def.lock || def.wrench){ spawnDrop(tx,ty,'b'+id,1); if (def.lock) markLocksDirty(); }   // item khusus selalu kembali
   else {
     if (Math.random() < DROP_BLOCK) spawnDrop(tx,ty,'b'+id,1);
-    if (SEEDABLE.includes(id) && Math.random() < DROP_SEED) spawnDrop(tx,ty,'s'+id,1);
+    if (SEEDABLE.includes(id) && Math.random() < (def.farm ? DROP_SEED_FARM : DROP_SEED)) spawnDrop(tx,ty,'s'+id,1);
   }
   if (def.gem){ const g = def.gem[0] + (Math.random()*(def.gem[1]-def.gem[0]+1)|0);
     if (g <= 12) for (let k=0;k<g;k++) spawnDrop(tx,ty,'gem',1);

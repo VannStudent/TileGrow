@@ -55,18 +55,18 @@ const T = {
   MAINDOOR:{id:23,name:'Pintu Utama',  hits:0,  deco:1},
   // v1.5: House Entrance — hanya bisa dilewati yang punya akses lock di tile itu; lainnya tertahan seperti tembok
   ENTRANCE:{id:24,name:'House Entrance', hits:4, xp:2,  price:50, deco:1, entrance:1},
-  WLOCK:  {id:30, name:'World Lock',   hits:0,  xp:0,  price:1800, wrench:'lock', lock:'world'},
+  WLOCK:  {id:30, name:'World Lock',   hits:0,  xp:0,  price:4500, wrench:'lock', lock:'world'},
   CLOCK:  {id:34, name:'Crystal Lock', hits:0,  xp:0,  wrench:'lock', lock:'world', worth:100},
   SLOCK:  {id:31, name:'Small Lock',   hits:0,  xp:0,  price:40,  wrench:'lock', lock:'small'},
   BLOCK_BG:{id:40,name:'Dinding Gua',  hits:2,  xp:1,  bg:1, price:1},
   BLOCK:  {id:32, name:'Big Lock',     hits:0,  xp:0,  price:120, wrench:'lock', lock:'big'},
   HLOCK:  {id:33, name:'Huge Lock',    hits:0,  xp:0,  price:400, wrench:'lock', lock:'huge'},
   // farmable (v1.4): gems per block 50–1000 dibagi per jenis, tumbuh lebih lama; dipecah juga memberi seed (30%)
-  FARM1:  {id:50, name:'Semak Permata', hits:3, xp:3,  gem:[50,150],   farm:1},
-  FARM2:  {id:51, name:'Jamur Kristal', hits:4, xp:4,  gem:[100,300],  farm:1},
-  FARM3:  {id:52, name:'Batu Bara Api', hits:5, xp:6,  gem:[200,500],  farm:1},
-  FARM4:  {id:53, name:'Lentera Emas',  hits:6, xp:8,  gem:[350,750],  farm:1, light:1},
-  FARM5:  {id:54, name:'Bunga Pelangi', hits:7, xp:10, gem:[500,1000], farm:1},
+  FARM1:  {id:50, name:'Semak Permata', hits:3, xp:3,  gem:[25,75],    farm:1},
+  FARM2:  {id:51, name:'Jamur Kristal', hits:4, xp:4,  gem:[50,150],   farm:1},
+  FARM3:  {id:52, name:'Batu Bara Api', hits:5, xp:6,  gem:[100,250],  farm:1},
+  FARM4:  {id:53, name:'Lentera Emas',  hits:6, xp:8,  gem:[175,375],  farm:1, light:1},
+  FARM5:  {id:54, name:'Bunga Pelangi', hits:7, xp:10, gem:[250,500],  farm:1},
   // block interaktif (v1.4): dipukul = acak angka (dihitung server), dipukul cepat berkali-kali = pecah
   DICE:   {id:60, name:'Dadu',          hits:4, xp:1,  price:150, roll:'dice'},
   ROULETTE:{id:61,name:'Roda Roulette', hits:5, xp:1,  price:400, roll:'roulette'},
@@ -168,7 +168,10 @@ function rarityOf(key){
 function rarityDef(key){ return RARITY[rarityOf(key)]; }
 
 // --- drop rate (atas permintaan user: block kembali 20–25%, seed 30%) ---
-const DROP_BLOCK = 0.225, DROP_SEED = 0.30, DROP_SEED_BG = 0.35;   // dinding gua: 30–40% seed
+const DROP_BLOCK = 0.225, DROP_SEED = 0.30, DROP_SEED_BG = 0.35;
+// v1.12 ekonomi: block farm & pohon farm lebih jarang memberi seed, supaya 1 seed tidak bisa menggandakan diri tanpa batas.
+// Rata-rata 1 seed farm = ~2 pohon (seed balik ~0,5) dan modal kembali ~2x. Hitungan: .agent/tools/tmp/balance3.cjs
+const DROP_SEED_FARM = 0.12, HARVEST_SEED = 0.5, HARVEST_SEED_FARM = 0.20;   // dinding gua: 30–40% seed
 const GEM_FROM_BLOCK = 0.12, GEM_FROM_TREE = [2,4];
 // XP level: butuh makin besar; level up memberi gems
 function xpNeeded(lv){ return Math.round(40 * Math.pow(1.35, lv - 1)); }
@@ -192,7 +195,7 @@ const SHOP = [
    give:[['b9',40],['b17',40],['b5',20],['b6',10]]},
   {key:'farmer',  name:'Farmer Pack',  desc:'5 seed tiap jenis dasar', price:150,
    give:[['s1',5],['s2',5],['s3',5],['s4',5],['s5',5],['s6',5]]},
-  {key:'b30', name:'World Lock',  desc:'Kunci seluruh world jadi milikmu. 100 World Lock: klik 2x di tas = 1 Crystal Lock', price:1800, give:[['b30',1]]},
+  {key:'b30', name:'World Lock',  desc:'Kunci seluruh world jadi milikmu. 100 World Lock: klik 2x di tas = 1 Crystal Lock', price:4500, give:[['b30',1]]},
   {key:'b31', name:'Small Lock',  desc:'Klaim 10 tile di sekitarnya', price:40,  give:[['b31',1]]},
   {key:'b32', name:'Big Lock',    desc:'Klaim 48 tile', price:120, give:[['b32',1]]},
   {key:'b33', name:'Huge Lock',   desc:'Klaim 200 tile', price:400, give:[['b33',1]]},
@@ -213,11 +216,11 @@ const SHOP = [
 const SLOT_NAME = {wings:'Sayap', hat:'Topi', hair:'Rambut', face:'Wajah', shirt:'Baju', pants:'Celana', tool:'Alat'};
 // farmable v1.4: paket 3 seed saja (tanpa block), supaya tidak ada untung instan dari membeli lalu langsung memecah.
 // Untung datang dari menanam: tiap pohon memberi 1–3 block, tiap block dipecah memberi gems sesuai rentangnya.
-const FARM_PACKS = [[50,400],[51,900],[52,1800],[53,3000],[54,4500]];
+const FARM_PACKS = [[50,400],[51,800],[52,1400],[53,2200],[54,3000]];   // v1.12: diseimbangkan (lihat SEED_FROM_FARM)
 for (const [id, price] of FARM_PACKS){
   const d = BY_ID[id];
   SHOP.push({key:'farm'+id, tab:'farm', name:d.name, price, give:[['s'+id,3]],
-    desc:'3 seed. Tiap block dipecah: ' + d.gem[0] + '–' + d.gem[1] + ' gems, 30% seed. Tumbuh ' + Math.round(GROW_MS[id]/60000) + ' menit'});
+    desc:'3 seed. Tiap block dipecah: ' + d.gem[0] + '–' + d.gem[1] + ' gems, ' + Math.round(DROP_SEED_FARM*100) + '% seed. Tumbuh ' + Math.round(GROW_MS[id]/60000) + ' menit'});
 }
 for (const k in WEAR){ const w = WEAR[k];
   SHOP.push({key:k, tab:'wear', name:w.name, desc:(w.desc || SLOT_NAME[w.slot]) + ' · klik di tas untuk pakai', price:w.price, give:[[k,1]]}); }
