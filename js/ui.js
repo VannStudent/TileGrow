@@ -234,6 +234,16 @@ function renderChat(){
   $('chatbox').classList.add('fresh'); clearTimeout(renderChat.t);
   renderChat.t = setTimeout(()=> $('chatbox').classList.remove('fresh'), 6000);
 }
+// v1.13: status yang dilihat pemain lain sebagai ikon di atas kepala.
+// ngetik = kolom chat sedang fokus DAN ada isinya belum dikirim (atau baru diketik < 4 detik);
+// menu = ada jendela (modal) terbuka: tas, toko, pengaturan, menu pemain, dialog block, dll.
+let typeT = 0;                                      // waktu ketikan terakhir (ms)
+function typingNow(){
+  const ci = $('chatIn'); if (!ci) return false;
+  if (document.activeElement !== ci) return false;
+  return !!ci.value || Date.now() - typeT < 4000;
+}
+function menuNow(){ return anyUIOpen() || invRows > 0; }   // tas terbuka juga dihitung
 function openChatInput(){ if ($('chatbox').classList.contains('min')){ $('chatbox').classList.remove('min'); renderChat(); placeTL(); } $('chatIn').focus(); }
 function toggleHud(){ const on = $('stage').classList.toggle('hudOff'); if (!on) toast('UI ditampilkan lagi.'); }
 
@@ -607,7 +617,8 @@ function bindUI(){
   $('eyeBtn').onclick = toggleHud;
   window.addEventListener('resize', placeTL); setTimeout(placeTL, 0);
   $('chatForm').onsubmit = e=>{ e.preventDefault(); const v = $('chatIn').value; $('chatIn').value = ''; playerSay(v); $('chatIn').blur(); };
-  $('chatIn').onfocus = ()=> $('chatbox').classList.add('focus');
+  $('chatIn').oninput = ()=> { typeT = Date.now(); };
+  $('chatIn').onfocus = ()=> { typeT = Date.now(); $('chatbox').classList.add('focus'); };
   $('chatIn').onblur = ()=> $('chatbox').classList.remove('focus');
   $('mWorlds').onclick = ()=>{ renderWorlds(); openModal('worldsM'); };
   $('wGo').onclick = ()=>{ const n = $('wIn').value; $('wIn').value = ''; closeModals(); gotoWorld(n); };

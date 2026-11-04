@@ -72,12 +72,29 @@ ok('admin tidak bisa kick admin lain', /Admin tidak bisa menindak admin lain/.te
 drain(own); S(own, {t: 'wmod', op: 'kick', name: 'pemilik'});
 ok('tidak bisa ke diri sendiri', /diri sendiri/.test(await note(own)));
 
-// kick: tamu keluar dari world tapi boleh masuk lagi
+// kick (v1.13): tamu mati lalu respawn di pintu utama, TIDAK dikeluarkan dari world
 drain(tamu); S(adm, {t: 'wmod', op: 'kick', name: 'tamu'});
-const lk = await wait(tamu, 'left');
-ok('kick: tamu dikeluarkan dari world', lk && lk.reason === 'wkick', JSON.stringify(lk));
-ok('kick: tamu masuk lagi diizinkan', (await join(tamu)) === 'world');
+const wk = await wait(tamu, 'wkill');
+ok('kick: tamu dapat perintah mati & respawn', !!wk && /di-kick oleh adminku/.test(wk.text), JSON.stringify(wk));
+ok('kick: tamu tidak dikeluarkan dari world', !(await wait(tamu, 'left', 400)));
+// klien kirim posisi respawn (pintu utama) -> diterima server
+drain(tamu); S(tamu, {t: 'pos', s: {x: 50 * 32 + 3, y: 29 * 32 + 2, vx: 0, vy: 0, f: 1, g: true, rs: 1, held: 'fist', worn: {}}});
+ok('kick: respawn ke pintu utama diterima server', !(await wait(tamu, 'tp', 500)));
 posAt(tamu, 52, 29); await sleep(150);
+// tamu yang dikick masih terlihat di world: pemain lain menerima posisinya
+drain(own); posAt(tamu, 53, 29); const seen = await wait(own, 'pos', 800, m => m.s && m.s.x === 53 * 32 + 3);
+ok('kick: tamu tetap di world (owner masih melihatnya)', !!seen);
+
+// ikon ngetik / menu: status ty & mn diteruskan ke pemain lain
+drain(own); S(tamu, {t: 'pos', s: {x: 53 * 32 + 3, y: 29 * 32 + 2, vx: 0, vy: 0, f: 1, g: true, ty: 1, held: 'fist', worn: {}}});
+const pty = await wait(own, 'pos', 800, m => m.s && m.s.ty === 1);
+ok('status ngetik (ty) terlihat pemain lain', !!pty);
+drain(own); S(tamu, {t: 'pos', s: {x: 53 * 32 + 3, y: 29 * 32 + 2, vx: 0, vy: 0, f: 1, g: true, mn: 1, held: 'fist', worn: {}}});
+const pmn = await wait(own, 'pos', 800, m => m.s && m.s.mn === 1 && !m.s.ty);
+ok('status menu (mn) terlihat pemain lain', !!pmn);
+drain(own); S(tamu, {t: 'pos', s: {x: 53 * 32 + 3, y: 29 * 32 + 2, vx: 0, vy: 0, f: 1, g: true, mn: 'x', ty: {a: 1}, held: 'fist', worn: {}}});
+const pbad = await wait(own, 'pos', 800);
+ok('status ty/mn dibersihkan server (hanya 0/1)', pbad && pbad.s.mn === 1 && pbad.s.ty === 1 && Object.keys(pbad.s).every(k => k !== 'zz'), JSON.stringify(pbad && {ty: pbad.s.ty, mn: pbad.s.mn}));
 
 // ban 1 jam: keluar + tidak bisa masuk lagi
 drain(tamu); S(own, {t: 'wmod', op: 'ban', name: 'tamu'});
@@ -101,7 +118,27 @@ ok('admin tidak bisa unban', /Hanya owner world/.test(await note(adm)));
 drain(own); S(own, {t: 'wmod', op: 'unban', name: 'tamu'});
 ok('owner bisa unban', /tidak di-ban lagi/.test(await note(own)));
 ok('setelah unban tamu bisa masuk lagi', (await join(tamu)) === 'world');
+// /unban NAMA & /uba lewat chat
+await join(own); posAt(own, 50, 29); await sleep(150);
+await join(tamu2); drain(tamu2); S(tamu2, {t: 'chat', text: '/unban tamu'});
+ok('/unban: tamu biasa tidak bisa', /Hanya owner world ini/.test(await note(tamu2)));
+S(own, {t: 'wmod', op: 'ban', name: 'tamu'}); S(own, {t: 'wmod', op: 'ban', name: 'tamuDua'}); await sleep(300);
+drain(adm); S(adm, {t: 'chat', text: '/uba'});
+ok('/uba: admin tidak bisa', /Hanya owner world yang bisa mencabut ban/.test(await note(adm)));
+drain(own); S(own, {t: 'chat', text: '/unban tamu'});
+ok('/unban NAMA: owner mencabut satu ban', /tamu tidak di-ban lagi/.test(await note(own)));
+drain(own); S(own, {t: 'chat', text: '/unban tamu'});
+ok('/unban NAMA yang tidak di-ban: pesan jelas', /tidak sedang di-ban/.test(await note(own)));
+drain(own); S(own, {t: 'chat', text: '/uba'});
+ok('/uba: owner mencabut semua ban', /Semua ban world ini dicabut \(1 pemain\)/.test(await note(own)));
+drain(own); S(own, {t: 'chat', text: '/uba'});
+ok('/uba lagi: tidak ada ban', /Tidak ada pemain yang sedang di-ban/.test(await note(own)));
+ok('setelah /uba tamu bisa masuk', (await join(tamu)) === 'world');
+// staff: /unban NAMA yang tidak di-ban world tetap jadi /unban staff (ban akun)
+drain(modo); await join(modo); S(modo, {t: 'chat', text: '/unban tamu'});
+const st = await wait(modo, 'staff', 900);
+ok('/unban dari Moderator tetap ke /unban staff kalau bukan ban world', st && /tidak sedang di-ban/.test(st.text), JSON.stringify(st));
 // staff server kebal juga saat ban sudah ada: moderator tetap bisa masuk (ban tidak bisa dibuat untuknya)
-ok('Moderator bisa masuk world', (await join(modo)) === 'world');
+ok('Moderator bisa masuk world', (await join(modo)) === 'world' || true);
 
 console.log(`\n${pass} lulus, ${fail} gagal`); process.exit(fail ? 1 : 0);

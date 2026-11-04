@@ -346,7 +346,9 @@ function drawPlayer(rx, ry){
 }
 
 // balon chat di atas kepala (seperti Growtopia), hilang setelah beberapa detik
+let BUBBLE_TOP = null;
 function drawBubble(cx, topY){
+  BUBBLE_TOP = null;
   if (!bubble || Date.now() > bubble.until) return;
   const now = Date.now(), age = now - bubble.t0, life = bubble.until - bubble.t0;
   const a = Math.min(1, age/120, (life - age)/300);
@@ -357,6 +359,7 @@ function drawBubble(cx, topY){
   if (line) lines.push(line);
   const L = lines.slice(0, 4), w = Math.max(...L.map(l => ctx.measureText(l).width)) + 14, h = L.length*12 + 8;
   const bx = Math.round(cx - w/2), by = Math.round(topY - h - 14 - (1-Math.min(1,age/120))*6);
+  BUBBLE_TOP = by - 2;                                      // v1.13: dipakai ikon ngetik supaya tidak menimpa balon
   ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(bx-2, by-2, w+4, h+4, 8); ctx.fill();
   ctx.beginPath(); ctx.moveTo(cx-6, by+h); ctx.lineTo(cx, by+h+9); ctx.lineTo(cx+6, by+h); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.roundRect(bx, by, w, h, 6); ctx.fill();

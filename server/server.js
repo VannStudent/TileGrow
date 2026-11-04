@@ -132,7 +132,7 @@ function handle(c, m){
       const w = worlds.get(c.world); if (!w) return;
       const s = m.s, num = v => typeof v === 'number' && isFinite(v) ? v : 0;
       const st = {x: num(s.x), y: num(s.y), vx: num(s.vx), vy: num(s.vy), f: s.f < 0 ? -1 : 1, g: !!s.g, sw: num(s.sw), sa: num(s.sa),
-                 fl: num(s.fl), dead: num(s.dead), an: num(s.an), rs: s.rs ? 1 : 0, held: typeof s.held === 'string' ? s.held.slice(0, 24) : 'fist',
+                 fl: num(s.fl), dead: num(s.dead), an: num(s.an), rs: s.rs ? 1 : 0, ty: s.ty ? 1 : 0, mn: s.mn ? 1 : 0, held: typeof s.held === 'string' ? s.held.slice(0, 24) : 'fist',
                  worn: cleanWornS(s.worn)};
       // pakaian hanya boleh yang benar-benar ada di tas
       const E = econOf(c.user);
@@ -220,6 +220,7 @@ function handle(c, m){
         if (privateMsg(c, text)) return;
         if (broadcastCmd(c, text)) return;
         if (emoteCmd(c, text)) return;
+        if (ctx.wmod.command(c, text)) return;          // v1.13: /uba, /unban ban world
         if (social.command(c, text)) return;
         return c.send({t: 'note', text: 'Perintah tidak dikenal: ' + text.split(' ')[0]});
       }

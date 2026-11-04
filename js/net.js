@@ -190,6 +190,10 @@ function netOnMessage(m){
     }
     case 'err': $('lbErr') && ($('lbErr').textContent = m.text); toast(m.text); net.joining = null; return;
     case 'kicked': netKickReason = m.reason; return;
+    case 'wkill':                                         // v1.13: di-kick owner/admin world = mati lalu respawn di pintu utama
+      if (inGame && pl && !(pl.dead > 0)){ pl.hp = 0; pl.dead = 1.2; burst(pl.x + pl.w/2, pl.y + pl.h/2, '#ff9494', 30); sfx('hurt'); shake(5); }
+      if (m.text) say('sys', m.text);
+      return;
     case 'left':                                          // v1.13: dikeluarkan / di-ban dari world oleh owner/admin world
       if (!m.reason) return;
       net.joining = null; $('lbHint') && ($('lbHint').textContent = '');
@@ -280,6 +284,14 @@ function drawRemotePlayers(){
       drawPlayer(r.rx, r.ry);
       // ikon kunci inggris di samping nama saat kita memegang Kunci Inggris: klik = menu pemain (trade, teman, report)
       if (WRENCH_HOLD()){ const b = wrenchIconBox(r); drawWrenchTag(b); r.wbox = b; } else r.wbox = null;
+      // v1.13: ikon ngetik / menu di atas kepala (di atas nama & balon chat)
+      if (typeof drawStatusIcon === 'function'){
+        // sejajar tengah nama (nama digambar 6px ke kanan dari tengah badan), di atas balon chat / emote kalau ada
+        let top = r.ry - (settings.showNames ? 21 : 9);
+        if (BUBBLE_TOP !== null) top = Math.min(top, BUBBLE_TOP - 7);
+        if (activeEmote(r.fake)) top -= 22;
+        drawStatusIcon(r, r.rx + r.fake.w/2 + (BUBBLE_TOP !== null ? 0 : 3), top);
+      }
     }
   } finally {
     ({pl, worn, bubble, playerFlag, playerName, guest} = saved); HELD_OVERRIDE = null; NAME_OVERRIDE = null;
@@ -313,7 +325,8 @@ function netTick(dt){
   if (net.sendT < 1/15) return;
   const s = {x: Math.round(pl.x*10)/10, y: Math.round(pl.y*10)/10, vx: Math.round(pl.vx), vy: Math.round(pl.vy), f: pl.face, g: pl.onGround,
     sw: Math.round(pl.swing*100)/100, sa: Math.round(pl.swingAng*100)/100, fl: Math.round(pl.flap*100)/100, dead: Math.round(pl.dead*10)/10,
-    an: Math.round(pl.angel*10)/10, held: selected().key, worn};
+    an: Math.round(pl.angel*10)/10, held: selected().key, worn,
+    ty: typingNow() ? 1 : 0, mn: menuNow() ? 1 : 0};   // v1.13: ikon ngetik / menu di atas kepala, dilihat pemain lain
   if (pl.rs){ s.rs = 1; pl.rs = 0; }                  // v1.13: tanda respawn (sekali)
   const key = JSON.stringify(s);
   if (key === net.lastSent && net.sendT < 1) return;
