@@ -21,7 +21,7 @@ function loadEcon(root){
     notePickup = (k, n) => __out.push(['pick', '+' + n + ' ' + itemDef(k).name]);
     pl = {x: 0, y: 0, w: 26, h: 30};
     var __load = s => { bag = s.bag; bagSlots = s.bagSlots; gems = s.gems; prog = s.prog; hot = [FIST]; selKey = FIST;
-                        worn = {wings: null, hat: null, shirt: null, pants: null, tool: null}; };
+                        worn = {wings: null, hat: null, hair: null, shirt: null, pants: null, tool: null}; };
     var __dump = () => ({bag, bagSlots, gems, prog});
     var __newEcon = () => { genWorld(); rollQuests(); return __dump(); };
     var __gen = () => { genTerrain(); return {fg: Array.from(fg), bgw: Array.from(bgw), trees: Array.from(trees.entries()),

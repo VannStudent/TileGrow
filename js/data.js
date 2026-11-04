@@ -77,7 +77,7 @@ const T = {
   ROCKP:  {id:42, name:'Platform Batu',hits:5,  xp:2,  price:6, platform:1}
 };
 // ===== WEARABLES (pakaian) =====
-// slot: wings (sayap, lompat ekstra), hat (topi), shirt (baju), pants (celana)
+// slot: wings (sayap, lompat ekstra), hat (topi), hair (rambut, v1.8), shirt (baju), pants (celana)
 const WINGS = {
   devil: {key:'w_devil', slot:'wings', name:'Devil Wings', price:1200, jumps:2, color:['#c6304a','#7a1526','#ff7a8f'], desc:'Sayap iblis. Lompat 2 kali'},
   angel: {key:'w_angel', slot:'wings', name:'Angel Wings', price:1200, jumps:2, color:['#f2f6ff','#b9c6de','#ffffff'], desc:'Sayap malaikat. Lompat 2 kali'},
@@ -99,6 +99,12 @@ const CLOTHES = {
   p_brown:  {slot:'pants', name:'Celana Cokelat', price:90,  color:['#7a5230','#4a3018','#a8774b']},
   p_white:  {slot:'pants', name:'Celana Putih',   price:160, color:['#e8ecf2','#a9b2c2','#ffffff']}
 };
+// v1.8: rambut (slot hair) — 4 gaya x 4 warna, dibeli di toko
+const HAIR_STYLES = {cepak: ['Rambut Cepak', 60], rapi: ['Rambut Pendek Rapi', 100], poni: ['Rambut Poni', 140], jabrik: ['Rambut Jabrik', 180]};
+const HAIR_COLORS = {hitam: ['Hitam', ['#2e2630','#17121c','#4f4558']], coklat: ['Cokelat', ['#7a4a26','#4a2a14','#a8703f']],
+  pirang: ['Pirang', ['#f2cc5a','#b88a24','#fff0a8']], merah: ['Merah', ['#d2452e','#8a2214','#ff7a5a']]};
+for (const st in HAIR_STYLES) for (const cl in HAIR_COLORS)
+  CLOTHES['r_' + st + '_' + cl] = {slot:'hair', name: HAIR_STYLES[st][0] + ' ' + HAIR_COLORS[cl][0], price: HAIR_STYLES[st][1], color: HAIR_COLORS[cl][1], style: st};
 // alat yang dipakai: pickaxe mempercepat pecah block
 const TOOLS = {
   pick_iron: {slot:'tool', name:'Pickaxe Besi',   price:900,  color:['#b9c3d2','#5b6478','#f0f4fa'], desc:'Pecah block 1 pukulan lebih cepat'},
@@ -194,7 +200,7 @@ const SHOP = [
   {key:'b63', tab:'fun', name:'Papan Catur', desc:'Meja catur sungguhan: pakai kunci inggris untuk main lawan pemain lain atau bot (Mudah/Sedang/Sulit)', price:200, give:[['b63',1]]},
   {key:'b61', tab:'fun', name:'Roda Roulette', desc:'Pukul untuk memutar roda 0–36 (merah/hitam/hijau). Hasilnya dilihat semua orang', price:400, give:[['b61',1]]},
 ];
-const SLOT_NAME = {wings:'Sayap', hat:'Topi', shirt:'Baju', pants:'Celana', tool:'Alat'};
+const SLOT_NAME = {wings:'Sayap', hat:'Topi', hair:'Rambut', shirt:'Baju', pants:'Celana', tool:'Alat'};
 // farmable v1.4: paket 3 seed saja (tanpa block), supaya tidak ada untung instan dari membeli lalu langsung memecah.
 // Untung datang dari menanam: tiap pohon memberi 1–3 block, tiap block dipecah memberi gems sesuai rentangnya.
 const FARM_PACKS = [[50,400],[51,900],[52,1800],[53,3000],[54,4500]];

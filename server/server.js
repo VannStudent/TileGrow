@@ -19,7 +19,7 @@ const {createNews} = require('./news');
 const Chess = require('../js/chess.js');
 
 const PORT = +process.env.PORT || 8080;
-const VERSION = 'v1.7';
+const VERSION = 'v1.8';
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = path.resolve(__dirname, '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
@@ -335,7 +335,7 @@ function refreshVisibility(c){
 }
 function kickClient(o, reason){ o.send({t: 'kicked', reason}); leaveWorld(o); o.user = null; setTimeout(() => o.close(), 50); }
 
-function cleanWornS(w){ const o = {}; if (w && typeof w === 'object') for (const k of ['wings','hat','shirt','pants','tool']) if (isStr(w[k], 24)) o[k] = w[k]; return o; }
+function cleanWornS(w){ const o = {}; if (w && typeof w === 'object') for (const k of ['wings','hat','hair','shirt','pants','tool']) if (isStr(w[k], 24)) o[k] = w[k]; return o; }
 
 // ---------- ekonomi per pemain (dipegang server) ----------
 const econs = new Map();                              // lower -> {bag, bagSlots, gems, prog}

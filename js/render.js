@@ -289,7 +289,7 @@ function drawPlayer(rx, ry){
   const o = {
     walk: walking, phase: walking ? Math.sin(ph) > 0 : false, air: !pl.onGround,
     bob: walking ? (Math.abs(Math.sin(ph)) > .6 ? 1 : 0) : (Math.sin(now/420) > .4 ? 1 : 0),
-    aBack: -idle, aFront: a, wings: wingsDef(), hat: worn.hat ? WEAR[worn.hat] : null,
+    aBack: -idle, aFront: a, wings: wingsDef(), hat: worn.hat ? WEAR[worn.hat] : null, hair: worn.hair ? WEAR[worn.hair] : null,
     shirt: worn.shirt ? WEAR[worn.shirt] : null, pants: worn.pants ? WEAR[worn.pants] : null,
     tool: holdTool ? toolDef() : null, flash: hurtFlash,
     flap: pl.flap > 0 ? Math.sin((1 - pl.flap/.3) * Math.PI) : (!pl.onGround ? (Math.sin(now/110) + 1)/2 : (Math.sin(now/700) + 1)/4),

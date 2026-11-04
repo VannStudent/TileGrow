@@ -11,7 +11,7 @@ let spawn = {x:0, y:0};   // posisi pintu utama
 let guest = false;        // mode tamu: menguji izin lock
 let playerName = 'Kamu';  // = username akun
 let playerFlag = 'ID';   // bendera dipilih saat login
-let worn = {wings:null, hat:null, shirt:null, pants:null, tool:null};   // pakaian yang dipakai per slot
+let worn = {wings:null, hat:null, hair:null, shirt:null, pants:null, tool:null};   // pakaian yang dipakai per slot
 let jumpsLeft = 0;        // sisa lompatan udara (wings)
 let worlds = {};          // nama world -> snapshot {fg,bgw,trees,meta,spawn}
 let worldName = 'START';  // world yang sedang dibuka
@@ -73,7 +73,7 @@ function genTerrain(){
   dmg.clear();
 }
 function genWorld(){
-  worlds = {}; worldName = 'START'; worn = {wings:null, hat:null, shirt:null, pants:null, tool:null};
+  worlds = {}; worldName = 'START'; worn = {wings:null, hat:null, hair:null, shirt:null, pants:null, tool:null};
   genTerrain(); worlds[worldName] = snapshotWorld();
   newPlayer();
   bagSlots = 16; gems = 50;

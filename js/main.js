@@ -49,7 +49,7 @@ function load(){
     genWorld();
     fg = Uint8Array.from(d.fg); bgw = Uint8Array.from(d.bgw); trees = new Map(d.trees); meta = new Map(d.meta);
     bag = d.bag; bagSlots = d.bagSlots; gems = d.gems; prog = d.prog; spawn = d.spawn;
-    worlds = d.worlds || {}; worldName = d.worldName || 'START'; playerName = d.playerName || 'Kamu'; worn = Object.assign({wings:null,hat:null,shirt:null,pants:null,tool:null}, d.worn || {}); markLocksDirty(); invRows = d.invRows || 0;
+    worlds = d.worlds || {}; worldName = d.worldName || 'START'; playerName = d.playerName || 'Kamu'; worn = Object.assign({wings:null,hat:null,hair:null,shirt:null,pants:null,tool:null}, d.worn || {}); markLocksDirty(); invRows = d.invRows || 0;
     selKey = d.selKey || FIST; hot = d.hot || []; if (!hot.length) initHotbar();
     chat.length = 0; (d.chat || []).forEach(c => chat.push(c));
     Object.assign(settings, d.settings || {});

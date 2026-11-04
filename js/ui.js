@@ -252,6 +252,7 @@ const SHOP_CATS = [
   {id:'paket',  name:'Paket Hemat',     tag:'Mulai dari sini',  color:['#ffcf3a','#e08a12'], icon:'b31'},
   {id:'farm',   name:'Farmable',        tag:'Tanam & panen gems', color:['#5ad87a','#1f8a4a'], icon:'s54'},
   {id:'wear',   name:'Wearables',       tag:'Sayap, baju, topi', color:['#e85aa8','#8a2a7a'], icon:'w_devil'},
+  {id:'hair',   name:'Rambut',          tag:'4 gaya x 4 warna', color:['#a8703f','#4a2a14'], icon:'r_jabrik_coklat'},
   {id:'lock',   name:'Lock & Alat',     tag:'Amankan world-mu',  color:['#7fd8f5','#2d6c8a'], icon:'b30'},
   {id:'khusus', name:'Block Khusus',    tag:'Papan, pintu, vending', color:['#c99159','#73491f'], icon:'b21'},
   {id:'fun',    name:'Interaktif',      tag:'Dadu, roulette, catur',   color:['#ff7a5a','#a8322a'], icon:'b61'},
@@ -264,7 +265,8 @@ function shopItemsOf(cat){
     if (cat === 'paket') return ['starter','builder','farmer','bag8'].includes(it.key);
     if (cat === 'lock') return ['b30','b31','b32','b33',WRENCH].includes(it.key);
     if (cat === 'khusus') return ['b20','b21','b22','b24','b40','b41','b42','b62'].includes(it.key);
-    if (cat === 'wear') return it.tab === 'wear';
+    if (cat === 'hair') return it.tab === 'wear' && WEAR[it.key] && WEAR[it.key].slot === 'hair';
+    if (cat === 'wear') return it.tab === 'wear' && !(WEAR[it.key] && WEAR[it.key].slot === 'hair');
     if (cat === 'farm') return it.tab === 'farm';
     if (cat === 'fun') return it.tab === 'fun';
     // block bangunan: x25 biasa, tanpa platform & dinding gua (pindah ke Block Khusus)
