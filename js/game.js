@@ -251,7 +251,7 @@ function placeBlock(tx,ty,d){
   if (def.wrench === 'sign')    meta.set(i, {sign:{text:''}});
   if (def.wrench === 'door')    meta.set(i, {door:{name:'', locked:false}});
   if (def.wrench === 'display') meta.set(i, {display:{key:null}});
-  if (def.wrench === 'vend')    meta.set(i, {vend:{owner:who(), key:null, n:0, price:0, earned:0}});
+  if (def.wrench === 'vend')    meta.set(i, {vend:{owner:who(), key:null, n:0, price:0, earned:0, per:'item', cur:'wl', gemsOld:0}});
   if (def.wrench === 'chess')   meta.set(i, {chess: Chess.newTable()});
   netTouch(i); stat('placed',1); questEvent('place',null,1);
 }
@@ -298,7 +298,7 @@ function punch(tx,ty){
     // efek pukulan di layar; server menghitung jumlah pukulan, drop, dan XP
     const m0 = meta.get(i);
     if (m0 && m0.lock && m0.lock.owner !== who()) return denied();
-    if (m0 && m0.vend && (m0.vend.n || m0.vend.earned)) return toast(m0.vend.owner === who() ? 'Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.' : 'Pakai kunci inggris untuk membeli dari Vending Machine.');
+    if (m0 && m0.vend && (m0.vend.n || m0.vend.earned || m0.vend.gemsOld)) return toast(m0.vend.owner === who() ? 'Ambil dulu stok dan hasil penjualan di Vending Machine sebelum memecahnya.' : 'Pakai kunci inggris untuk membeli dari Vending Machine.');
     if (id === 8){ const tr = trees.get(i); if (tr && Date.now() - tr.t0 < GROW_MS[tr.kind]) return toast('Pohon belum siap dipanen.'); }
     const k = 'f' + i, dd = dmg.get(k) || {n:0, x:tx, y:ty, bg:false}; dd.n++; dd.t = Date.now(); dmg.set(k, dd);
     puff(tx,ty,id,3); sfx('hit'); shake(1.5);
@@ -306,7 +306,7 @@ function punch(tx,ty){
   }
   const m = meta.get(i);
   if (m && m.lock && m.lock.owner !== who()) return denied();
-  if (m && m.vend && (m.vend.n || m.vend.earned)) return toast('Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.');
+  if (m && m.vend && (m.vend.n || m.vend.earned || m.vend.gemsOld)) return toast('Ambil dulu stok dan hasil penjualan di Vending Machine sebelum memecahnya.');
   if (m && m.display && m.display.key){             // ambil item dari kotak pajang dulu
     const k = m.display.key; m.display.key = null; netTouch(i); spawnDrop(tx,ty,k,1); return toast('Item diambil dari Kotak Pajang.');
   }

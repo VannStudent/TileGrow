@@ -3,7 +3,7 @@
 const path = require('path');
 const {loadEcon} = require('./econ');
 const PORT = +process.env.PORT || 8080;
-const VERSION = 'v1.8';
+const VERSION = 'v1.10';
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = path.resolve(__dirname, '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');

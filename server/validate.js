@@ -30,7 +30,10 @@ function validMeta(f, i, mt){
   if (need === 'display') return v.key === null || (isStr(v.key, 24) && /^[a-z0-9_]+$/i.test(v.key));
   if (need === 'vend') return isName(v.owner) && (v.key === null || (econ.isKey(v.key) && v.key !== D.FIST && v.key !== D.WRENCH))
     && Number.isInteger(v.n) && v.n >= 0 && v.n <= D.STACK && Number.isInteger(v.price) && v.price >= 0 && v.price <= VEND_PRICE_MAX
-    && Number.isInteger(v.earned) && v.earned >= 0 && (v.key !== null || v.n === 0);
+    && Number.isInteger(v.earned) && v.earned >= 0 && (v.key !== null || v.n === 0)
+    // v1.10: bayar World Lock. per = 'item' (X WL per item) | 'wl' (1 WL dapat X item); gemsOld = kas gems dari versi lama
+    && (v.per === undefined || v.per === 'item' || v.per === 'wl') && (v.cur === undefined || v.cur === 'wl')
+    && (v.gemsOld === undefined || (Number.isInteger(v.gemsOld) && v.gemsOld >= 0));
   // lock
   if (v.type !== LOCK_TYPE[f] || !isName(v.owner) || !Array.isArray(v.access) || v.access.length > 50 || !v.access.every(a => isStr(a, 16))
       || typeof v.public !== 'boolean' || (v.ignoreAir !== undefined && typeof v.ignoreAir !== 'boolean')) return false;
@@ -70,7 +73,7 @@ function cleanWorld(d, user){
   for (const e of d.trees) if (ok(e) && validTree(d.fg[e[0]], e[1])) trees.set(e[0], e[1]);
   return {fg: d.fg, bgw: d.bgw, trees: [...trees.entries()], meta: [...meta.entries()], spawn: {x: d.spawn.x, y: d.spawn.y}, cols: COLS, rows: ROWS, created: Date.now()};
 }
-function cleanWornS(w){ const o = {}; if (w && typeof w === 'object') for (const k of ['wings','hat','hair','shirt','pants','tool']) if (isStr(w[k], 24)) o[k] = w[k]; return o; }
+function cleanWornS(w){ const o = {}; if (w && typeof w === 'object') for (const k of ['wings','hat','hair','face','shirt','pants','tool']) if (isStr(w[k], 24)) o[k] = w[k]; return o; }
 // harga maksimal per item di Vending Machine
 const VEND_PRICE_MAX = 100000;
 // klaim tile lock area (sama dengan claimTiles() di world.js, dihitung server)

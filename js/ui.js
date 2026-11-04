@@ -112,7 +112,7 @@ function itemFacts(key){
     const b = BY_ID[d.id];
     if (b.lock) f.push(['Fungsi', b.lock === 'world' ? 'Mengunci seluruh world' + (b.worth ? ' (bernilai ' + b.worth + ' World Lock)' : '') : 'Mengunci ' + LOCK_TILES[b.lock] + ' tile di sekitarnya']);
     else if (b.roll) f.push(['Fungsi', b.roll === 'dice' ? 'Pukul untuk lempar dadu 1–6' : 'Pukul untuk memutar roda 0–36']);
-    else if (b.wrench) f.push(['Fungsi', {sign:'Papan untuk menulis teks', door:'Pintu yang bisa diberi nama & dikunci', display:'Memajang satu item', vend:'Menjual item ke pemain lain (stok, harga, kas gems)'}[b.wrench] || '-']);
+    else if (b.wrench) f.push(['Fungsi', {sign:'Papan untuk menulis teks', door:'Pintu yang bisa diberi nama & dikunci', display:'Memajang satu item', vend:'Menjual item ke pemain lain, dibayar pakai World Lock'}[b.wrench] || '-']);
     else if (b.platform) f.push(['Jenis', 'Platform (bisa dilewati dari bawah)']);
     else if (b.bg) f.push(['Jenis', 'Dinding belakang']);
     else f.push(['Jenis', b.solid ? 'Block padat' : 'Dekorasi']);
@@ -253,6 +253,7 @@ const SHOP_CATS = [
   {id:'farm',   name:'Farmable',        tag:'Tanam & panen gems', color:['#5ad87a','#1f8a4a'], icon:'s54'},
   {id:'wear',   name:'Wearables',       tag:'Sayap, baju, topi', color:['#e85aa8','#8a2a7a'], icon:'w_devil'},
   {id:'hair',   name:'Rambut',          tag:'4 gaya x 4 warna', color:['#a8703f','#4a2a14'], icon:'r_jabrik_coklat'},
+  {id:'face',   name:'Kacamata',        tag:'Kacamata & monocle', color:['#5a6a86','#2b3445'], icon:'f_sun'},
   {id:'lock',   name:'Lock & Alat',     tag:'Amankan world-mu',  color:['#7fd8f5','#2d6c8a'], icon:'b30'},
   {id:'khusus', name:'Block Khusus',    tag:'Papan, pintu, vending', color:['#c99159','#73491f'], icon:'b21'},
   {id:'fun',    name:'Interaktif',      tag:'Dadu, roulette, catur',   color:['#ff7a5a','#a8322a'], icon:'b61'},
@@ -266,7 +267,8 @@ function shopItemsOf(cat){
     if (cat === 'lock') return ['b30','b31','b32','b33',WRENCH].includes(it.key);
     if (cat === 'khusus') return ['b20','b21','b22','b24','b40','b41','b42','b62'].includes(it.key);
     if (cat === 'hair') return it.tab === 'wear' && WEAR[it.key] && WEAR[it.key].slot === 'hair';
-    if (cat === 'wear') return it.tab === 'wear' && !(WEAR[it.key] && WEAR[it.key].slot === 'hair');
+    if (cat === 'face') return it.tab === 'wear' && WEAR[it.key] && WEAR[it.key].slot === 'face';
+    if (cat === 'wear') return it.tab === 'wear' && !(WEAR[it.key] && (WEAR[it.key].slot === 'hair' || WEAR[it.key].slot === 'face'));
     if (cat === 'farm') return it.tab === 'farm';
     if (cat === 'fun') return it.tab === 'fun';
     // block bangunan: x25 biasa, tanpa platform & dinding gua (pindah ke Block Khusus)
@@ -475,13 +477,19 @@ function openDialog(kind, ctxd){
 // Pemilik: isi stok dari tas, pasang harga, ambil stok & gems hasil jualan. Pemain lain: beli.
 // Online: semua lewat server (pesan 'vend'); dialog digambar ulang saat tile berubah.
 let vendOpen = null;
+// v1.10: alat bayar = World Lock (Crystal Lock = 100 WL). per 'item': X WL per item · per 'wl': 1 WL dapat X item
+function vendMig(V){ if (V.cur !== 'wl'){ V.gemsOld = (V.gemsOld || 0) + (V.earned || 0); V.earned = 0; V.price = 0; V.per = 'item'; V.cur = 'wl'; } return V; }
+function wlHave(){ return countOf('b30') + countOf('b34') * 100; }
+function vendDeal(V, n){ return V.per === 'wl' ? {qty: n * V.price, wl: n} : {qty: n, wl: n * V.price}; }
 function vendSend(op, extra){
   const V = meta.get(vendOpen) && meta.get(vendOpen).vend; if (!V) return;
   if (online()) return netSend(Object.assign({t: 'vend', op, i: vendOpen}, extra || {}));
   // offline: hanya pemilik (kamu sendiri) yang ada di world ini
+  vendMig(V);
   const fmt = n => n.toLocaleString('id-ID'), nm = k => itemDef(k).name;
   if (op === 'stock'){
     const {key, n} = extra;
+    if (key === 'b30' || key === 'b34') return toast('World Lock & Crystal Lock adalah alat bayar, tidak bisa dijual.');
     if (V.key && V.n > 0 && V.key !== key) return toast('Mesin masih berisi ' + nm(V.key) + '. Ambil stoknya dulu.');
     if (countOf(key) < n) return toast('Kamu hanya punya ' + countOf(key) + ' ' + nm(key) + '.');
     if (V.n + n > STACK) return toast('Stok maksimal ' + STACK + '.');
@@ -491,11 +499,16 @@ function vendSend(op, extra){
     const k = addItem(V.key, V.n); if (!k) return toast('Tas penuh.');
     V.n -= k; if (!V.n) V.key = null;
   } else if (op === 'price'){
-    if (!(extra.price >= 1 && extra.price <= 100000)) return toast('Harga 1–100.000 gems per item.');
-    V.price = extra.price; toast('Harga diatur: ' + fmt(V.price) + ' gems per item.');
+    const per = extra.per === 'wl' ? 'wl' : 'item', max = per === 'wl' ? STACK : 100000;
+    if (!(extra.price >= 1 && extra.price <= max)) return toast(per === 'wl' ? 'Isi 1–' + STACK + ' item per World Lock.' : 'Harga 1–100.000 World Lock per item.');
+    V.price = extra.price; V.per = per;
+    toast(per === 'wl' ? 'Harga diatur: 1 World Lock dapat ' + V.price + ' item.' : 'Harga diatur: ' + fmt(V.price) + ' World Lock per item.');
   } else if (op === 'collect'){
-    if (!V.earned) return toast('Belum ada hasil penjualan.');
-    gems += V.earned; say('act', fmt(V.earned) + ' gems hasil penjualan diambil.'); V.earned = 0;
+    if (!V.earned && !V.gemsOld) return toast('Belum ada hasil penjualan.');
+    const cl = Math.floor(V.earned / 100), wl = V.earned % 100;
+    if ((cl && canAdd('b34', cl) < cl) || (wl && canAdd('b30', wl) < wl)) return toast('Tas penuh.');
+    if (cl) addItem('b34', cl); if (wl) addItem('b30', wl); gems += V.gemsOld || 0;
+    say('act', 'Hasil penjualan diambil.'); V.earned = 0; V.gemsOld = 0;
   }
   netTouch(vendOpen); sfx('place'); refreshUI(); renderVend();
 }
@@ -503,28 +516,38 @@ function openVend(i){ vendOpen = i; renderVend(); openModal('dlg'); const x = do
 function renderVend(){
   const box = $('dlgBody'), m = vendOpen !== null && meta.get(vendOpen);
   if (!m || !m.vend || fg[vendOpen] !== 62){ if (vendOpen !== null && !$('dlg').classList.contains('hidden')) closeModals(); vendOpen = null; return; }
-  const V = m.vend, mine = V.owner === who(), fmt = n => n.toLocaleString('id-ID');
+  const V0 = m.vend, V = vendMig({...V0}), mine = V.owner === who(), fmt = n => n.toLocaleString('id-ID');
+  const WL = '<img class="wlI" src="' + icon('b30') + '">';
+  const priceTxt = !V.price ? 'belum diatur' : V.per === 'wl' ? '1 World Lock = ' + V.price + ' item' : fmt(V.price) + ' World Lock / item';
   const itemRow = V.key
     ? '<div class="vendItem"><img src="' + icon(V.key) + '"><div><b>' + esc(itemDef(V.key).name) + '</b><span class="rar" style="--rc:' + rarityDef(V.key).color + '">' + rarityDef(V.key).name + '</span><br>' +
-      '<span class="note">Stok: <b>' + V.n + '</b> · Harga: <b style="color:#7be37a">' + (V.price ? fmt(V.price) + ' gems' : 'belum diatur') + '</b> / item</span></div></div>'
+      '<span class="note">Stok: <b>' + V.n + '</b> · Harga: <b style="color:#ffd25e">' + priceTxt + '</b></span></div></div>'
     : '<p class="note">Mesin kosong.' + (mine ? ' Pilih item dari tas di bawah untuk dijual.' : '') + '</p>';
   $('dlgTitle').textContent = 'Vending Machine · ' + V.owner;
   let html = itemRow;
   if (mine){
-    const opts = bag.filter(s => s.key !== FIST && s.key !== WRENCH && !isWorn(s.key) && (!V.key || !V.n || s.key === V.key));
+    const opts = bag.filter(s => s.key !== FIST && s.key !== WRENCH && s.key !== 'b30' && s.key !== 'b34' && !isWorn(s.key) && (!V.key || !V.n || s.key === V.key));
+    const cashTxt = fmt(V.earned) + ' World Lock' + (V.gemsOld ? ' + ' + fmt(V.gemsOld) + ' gems (lama)' : '');
     html += '<label>Isi stok dari tas</label><div class="pickgrid" id="vPick">' +
       opts.map(s => '<div class="cell' + (s.key === V.key ? ' on' : '') + '" data-k="' + esc(s.key) + '" title="' + esc(itemDef(s.key).name) + ' (' + s.n + ')"><img src="' + icon(s.key) + '"><span class="n">' + s.n + '</span></div>').join('') + '</div>' +
       '<div class="vendRow"><input id="vN" type="number" min="1" max="' + STACK + '" value="1"><button class="btn" id="vStock" type="button">Masukkan</button>' +
       '<button class="btn" id="vTake" type="button"' + (V.n ? '' : ' disabled') + '>Ambil semua stok</button></div>' +
-      '<label>Harga per item (gems)</label><div class="vendRow"><input id="vPrice" type="number" min="1" max="100000" value="' + (V.price || '') + '" placeholder="contoh: 50"><button class="btn" id="vSetPrice" type="button">Pasang harga</button></div>' +
-      '<div class="vendRow vendCash"><span>Kas mesin: <b style="color:#7be37a">' + fmt(V.earned) + ' gems</b></span><button class="btn primary" id="vCollect" type="button"' + (V.earned ? '' : ' disabled') + '>Ambil gems</button></div>' +
-      '<p class="note">Pembeli memakai kunci inggris pada mesin ini. Mesin hanya bisa dipecah kalau stok dan kas sudah kosong.</p>';
+      '<label>Harga (bayar pakai World Lock)</label>' +
+      '<div class="vendRow"><select id="vPer"><option value="item"' + (V.per !== 'wl' ? ' selected' : '') + '>World Lock per 1 item</option><option value="wl"' + (V.per === 'wl' ? ' selected' : '') + '>Item per 1 World Lock</option></select>' +
+      '<input id="vPrice" type="number" min="1" max="100000" value="' + (V.price || '') + '" placeholder="contoh: 2"><button class="btn" id="vSetPrice" type="button">Pasang harga</button></div>' +
+      '<p class="note" id="vPerNote"></p>' +
+      '<div class="vendRow vendCash"><span>Kas mesin: ' + WL + ' <b style="color:#ffd25e">' + cashTxt + '</b></span><button class="btn primary" id="vCollect" type="button"' + (V.earned || V.gemsOld ? '' : ' disabled') + '>Ambil hasil</button></div>' +
+      '<p class="note">Hasil 100 World Lock diberikan sebagai 1 Crystal Lock. Pembeli memakai kunci inggris pada mesin ini. Mesin hanya bisa dipecah kalau stok dan kas sudah kosong.</p>';
   } else {
-    const can = V.key && V.n > 0 && V.price > 0, maxN = can ? Math.max(1, Math.min(V.n, Math.floor(gems / V.price))) : 1;
-    html += can ? '<div class="vendRow"><label style="margin:0">Jumlah</label><input id="vN" type="number" min="1" max="' + V.n + '" value="1">' +
+    const can = V.key && V.n > 0 && V.price > 0;
+    // n = jumlah item (mode item) atau jumlah WL (mode wl)
+    const maxN = !can ? 1 : V.per === 'wl' ? Math.max(1, Math.min(Math.floor(V.n / V.price), wlHave())) : Math.max(1, Math.min(V.n, Math.floor(wlHave() / V.price)));
+    const okStock = !can || V.per !== 'wl' || V.n >= V.price;
+    html += can && okStock ? '<div class="vendRow"><label style="margin:0">' + (V.per === 'wl' ? 'Bayar (World Lock)' : 'Jumlah item') + '</label><input id="vN" type="number" min="1" max="' + maxN + '" value="1">' +
       '<button class="btn" id="vMax" type="button">Maks (' + maxN + ')</button></div>' +
-      '<div class="vendRow vendCash"><span>Total: <b id="vTotal" style="color:#7be37a">' + fmt(V.price) + ' gems</b> · Gems-mu: ' + fmt(gems) + '</span><button class="btn primary" id="vBuy" type="button">Beli</button></div>'
-      : '<p class="note">' + (V.key && V.n > 0 ? 'Pemilik belum memasang harga.' : 'Stok habis.') + '</p>';
+      '<div class="vendRow vendCash"><span id="vTotal"></span><button class="btn primary" id="vBuy" type="button">Beli</button></div>' +
+      '<p class="note">World Lock-mu: ' + WL + ' <b>' + fmt(wlHave()) + '</b> (Crystal Lock otomatis dipecah kalau kurang).</p>'
+      : '<p class="note">' + (!can ? (V.key && V.n > 0 ? 'Pemilik belum memasang harga.' : 'Stok habis.') : 'Stok kurang dari 1 paket (' + V.price + ' item).') + '</p>';
   }
   box.innerHTML = html;
   $('dlgSave').style.display = 'none';
@@ -533,14 +556,19 @@ function renderVend(){
     let pick = V.key || (opts0 => opts0 && opts0.dataset.k)(box.querySelector('#vPick .cell'));
     box.querySelectorAll('#vPick .cell').forEach(c => c.onclick = ()=>{ box.querySelectorAll('#vPick .cell').forEach(x => x.classList.remove('on')); c.classList.add('on'); pick = c.dataset.k; $('vN').max = countOf(pick); });
     if (!V.key){ const f = box.querySelector('#vPick .cell'); if (f) f.classList.add('on'); }
+    const perNote = ()=>{ const p = parseInt($('vPrice').value, 10) || 0;
+      $('vPerNote').textContent = !p ? '' : $('vPer').value === 'wl' ? 'Pembeli membayar 1 World Lock untuk ' + p + ' item.' : 'Pembeli membayar ' + p + ' World Lock untuk 1 item.'; };
+    $('vPer').onchange = perNote; $('vPrice').oninput = perNote; perNote();
     $('vStock').onclick = ()=>{ if (!pick) return toast('Pilih item dulu.'); vendSend('stock', {key: pick, n: N()}); };
     $('vTake').onclick = ()=> vendSend('take', {n: V.n});
-    $('vSetPrice').onclick = ()=> vendSend('price', {price: parseInt($('vPrice').value, 10) || 0});
+    $('vSetPrice').onclick = ()=> vendSend('price', {price: parseInt($('vPrice').value, 10) || 0, per: $('vPer').value});
     $('vCollect').onclick = ()=> vendSend('collect');
   } else if ($('vBuy')){
-    const upd = ()=> $('vTotal').textContent = fmt(V.price * Math.min(N(), V.n)) + ' gems';
-    $('vN').oninput = upd; $('vMax').onclick = ()=>{ $('vN').value = Math.max(1, Math.min(V.n, Math.floor(gems / V.price))); upd(); };
-    $('vBuy').onclick = ()=>{ const n = Math.min(N(), V.n); if (V.price * n > gems) return toast('Gems tidak cukup.'); vendSend('buy', {n, key: V.key, price: V.price}); };
+    const upd = ()=>{ const d = vendDeal(V, N()); $('vTotal').innerHTML = 'Dapat <b>' + d.qty + '</b> item · bayar ' + WL + ' <b style="color:#ffd25e">' + fmt(d.wl) + ' World Lock</b>'; };
+    $('vN').oninput = upd; upd();
+    $('vMax').onclick = ()=>{ $('vN').value = $('vN').max; upd(); };
+    $('vBuy').onclick = ()=>{ const n = N(), d = vendDeal(V, n); if (d.qty > V.n) return toast('Stok tidak cukup.'); if (d.wl > wlHave()) return toast('World Lock tidak cukup.');
+      vendSend('buy', {n, key: V.key, price: V.price, per: V.per}); };
   }
 }
 function esc(s){ return String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }

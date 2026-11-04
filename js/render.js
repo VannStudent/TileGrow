@@ -289,7 +289,7 @@ function drawPlayer(rx, ry){
   const o = {
     walk: walking, phase: walking ? Math.sin(ph) > 0 : false, air: !pl.onGround,
     bob: walking ? (Math.abs(Math.sin(ph)) > .6 ? 1 : 0) : (Math.sin(now/420) > .4 ? 1 : 0),
-    aBack: -idle, aFront: a, wings: wingsDef(), hat: worn.hat ? WEAR[worn.hat] : null, hair: worn.hair ? WEAR[worn.hair] : null,
+    aBack: -idle, aFront: a, wings: wingsDef(), hat: worn.hat ? WEAR[worn.hat] : null, hair: worn.hair ? WEAR[worn.hair] : null, face: worn.face ? WEAR[worn.face] : null,
     shirt: worn.shirt ? WEAR[worn.shirt] : null, pants: worn.pants ? WEAR[worn.pants] : null,
     tool: holdTool ? toolDef() : null, flash: hurtFlash,
     flap: pl.flap > 0 ? Math.sin((1 - pl.flap/.3) * Math.PI) : (!pl.onGround ? (Math.sin(now/110) + 1)/2 : (Math.sin(now/700) + 1)/4),
@@ -492,18 +492,14 @@ function draw(alpha){
   // retakan di dinding belakang
   for (const [k,d] of dmg) if (d.bg) drawCracks(d.x, d.y, d.n / BY_ID[bgw[idx(d.x,d.y)]||40].hits);
 
-  // outline gelap tebal
-  ctx.fillStyle = OL;
-  for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++){
-    const id = fg[idx(x,y)]; if (!id || id === 8 || BY_ID[id].deco || BY_ID[id].platform) continue;
-    ctx.fillRect(x*TS - 2, y*TS - 2, TS + 4, TS + 4);
-  }
+  // v1.10: outline luar tebal dihapus (dulu 2 px hitam + tekstur menjorok 2 px = garis ~3-4 px).
+  // Sekarang tepi block cukup dari garis 1 px di teksturnya sendiri.
   // tekstur
   for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++){
     const i = idx(x,y), id = fg[i]; if (!id || id === 8) continue;
     const sx = x*TS, sy = y*TS;
     const same = (ax,ay)=> tileAt(ax,ay) === id;
-    const l = same(x-1,y)?0:2, r = same(x+1,y)?0:2, t = same(x,y-1)?0:2, b = same(x,y+1)?0:2;
+    const l = 0, r = 0, t = 0, b = 0;   // v1.10: tidak menjorok lagi (dulu 2 px di tepi grup untuk outline tebal)
     if (BY_ID[id].platform){ ctx.drawImage(texAt(id, x, y), sx, sy, TS, TS); continue; }
     { const tx0 = texAt(id, x, y); ctx.drawImage(tx0, 0, 0, tx0.width, tx0.height, sx + l, sy + t, TS - l - r, TS - t - b); }
     const above = tileAt(x,y-1), openTop = !above || !BY_ID[above].solid;
@@ -625,7 +621,7 @@ function drawGhost(){
   if (!free) return;
   ctx.save(); ctx.globalAlpha = .25;
   if (d.kind === 'seed') drawSeed(ctx, tx*TS + TS/2, ty*TS + TS/2, 1.3, BY_ID[d.id].color);
-  else { ctx.fillStyle = OL; ctx.fillRect(tx*TS - 2, ty*TS - 2, TS + 4, TS + 4); ctx.drawImage(TEX[d.id], tx*TS, ty*TS, TS, TS); }
+  else ctx.drawImage(TEX[d.id], tx*TS, ty*TS, TS, TS);
   ctx.restore();
 }
 function drawCracks(x,y,f){

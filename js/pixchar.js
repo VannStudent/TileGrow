@@ -99,6 +99,35 @@ const PX_HAIR = {
   poni:  {dy: -2, rows: ["....2222222222", "..22333111111122", ".2133111111111112", ".2111111111111112", ".2111111111111112", ".2111111111111112", ".2111111121212112", ".2111112.2.2.2.2", ".211112", ".21112", ".21112", ".2222"]},
   jabrik:{dy: -4, rows: ["..2..212..212..2", "..212211122111122112", ".21111111111111112", ".2133111111111112", ".2131111111111112", ".2111111111111112", ".21111111111122", ".2111112", ".21112", ".212"]}
 };
+// v1.10: aksesori wajah (slot 'face'): kacamata & monocle. Digambar di atas mata, di bawah topi.
+// Koordinat relatif atas kepala (hy). Mata ada di x -4..-1 dan 1..4, baris ey = hy + 6.
+// pal: 1 = bingkai, 2 = bingkai gelap, 3 = lensa, 4 = kilau lensa
+function pxFace(P, F, hy){
+  const ey = hy + 6, c = F.color, L = (x, y, w, h, k) => P.rect(x, y, w, h, k);
+  const st = F.style;
+  if (st === 'sunglass'){            // kacamata hitam: lensa gelap lebar + jembatan
+    L(-6, ey - 1, 6, 4, c[0]); L(0, ey - 1, 1, 1, c[0]); L(1, ey - 1, 5, 4, c[0]);
+    L(-5, ey, 4, 2, c[2]); L(2, ey, 3, 2, c[2]); P.set(-5, ey, c[3]); P.set(2, ey, c[3]);
+    L(-8, ey - 1, 2, 1, c[1]);       // tangkai ke telinga
+  } else if (st === 'round'){       // kacamata bulat: bingkai emas tipis di luar mata, lensa bening berkilau
+    for (const ox of [-6, 1]){ L(ox + 2, ey - 2, 2, 1, c[0]); L(ox + 2, ey + 3, 2, 1, c[0]); L(ox, ey, 1, 2, c[0]); L(ox + 5, ey, 1, 2, c[0]);
+      P.set(ox + 1, ey - 2 + 1, c[0]); P.set(ox + 4, ey - 1, c[0]); P.set(ox + 1, ey + 2, c[0]); P.set(ox + 4, ey + 2, c[0]);
+      L(ox + 1, ey - 1, 4, 1, c[2]); P.set(ox + 1, ey - 1, c[3]); }
+    L(0, ey - 1, 1, 1, c[0]); L(-8, ey - 1, 2, 1, c[1]);
+  } else if (st === '3d'){          // kacamata 3D: bingkai putih, lensa merah & biru
+    L(-6, ey - 1, 12, 5, c[0]); L(-5, ey, 4, 3, '#e8344a'); L(1, ey, 4, 3, '#3f8cff'); L(-1, ey + 2, 2, 2, c[1]);
+    P.set(-5, ey, '#ff8a9a'); P.set(1, ey, '#9cc6ff'); L(-8, ey - 1, 2, 1, c[1]);
+  } else if (st === 'monocle'){     // monocle: satu lensa bulat di mata depan (bingkai tebal 2 warna) + rantai menjuntai
+    const ox = 0; L(ox + 1, ey - 2, 4, 1, c[0]); L(ox + 1, ey + 3, 4, 1, c[1]); L(ox, ey - 1, 1, 4, c[0]); L(ox + 5, ey - 1, 1, 4, c[1]);
+    P.unset(ox + 1, ey - 2); P.unset(ox + 4, ey + 3);   // sudut dibulatkan
+    P.set(ox + 1, ey - 1, c[0]); P.set(ox + 4, ey + 2, c[1]);
+    L(ox + 1, ey - 1, 4, 1, c[2]); P.set(ox + 1, ey - 1, c[3]);
+    for (let k = 0; k < 5; k++) P.set(ox + 6 - (k > 2 ? 1 : 0), ey + 2 + k, c[1]);
+  } else if (st === 'ski'){         // kacamata ski: tali merah melingkar kepala + lensa oranye besar mengkilap
+    L(-9, ey - 1, 3, 3, c[1]); L(7, ey - 1, 2, 3, c[1]);
+    L(-6, ey - 2, 13, 6, c[0]); L(-5, ey - 1, 11, 4, c[2]); L(-5, ey - 1, 5, 1, c[3]); L(-5, ey, 2, 1, c[3]); L(0, ey + 2, 1, 1, c[0]); L(-1, ey + 3, 3, 1, c[0]);
+  }
+}
 function pxHair(P, H, hy, hatOn){
   const S = PX_HAIR[H.style] || PX_HAIR.rapi, pal = {'1': H.color[0], '2': H.color[1], '3': H.color[2]};
   for (let r = 0; r < S.rows.length; r++){
@@ -183,6 +212,8 @@ function pxPaintChar(P, o){
     const pal = {'1': o.hat.color[0], '2': o.hat.color[1], '3': o.hat.color[2], b: '#3fa8ff', r: '#e8344a', g: '#3fd17a', k: '#5a5f6e', l: '#fff6c4'};
     P.map(rows, -Math.floor(rows[0].length/2), H.y0 - b, pal); P.flush();
   }
+  // aksesori wajah di atas topi (supaya kacamata ski/kacamata tidak tertutup pinggiran topi)
+  if (o.face){ pxFace(P, o.face, hy); P.flush(true); }
   P.mapRot(PX_ARM, armPal(false), 1.5, .5, 4, -13 - b, o.aFront || 0); P.flush();
   if (o.tool){
     const a = o.aFront || 0, fx = 4 - Math.sin(a)*6, fy = -13 - b + Math.cos(a)*6;
@@ -209,6 +240,7 @@ function pxWearIcon(d){
   const P = pxPainter(24, 24, 12, 12), w = d.wear;
   if (d.slot === 'hat'){ const H = PX_HAT[w.style] || PX_HAT.beanie; P.map(H.rows, -Math.floor(H.rows[0].length/2), -Math.ceil(H.rows.length/2), {'1': w.color[0], '2': w.color[1], '3': w.color[2], b: '#3fa8ff', r: '#e8344a', g: '#3fd17a', k: '#5a5f6e', l: '#fff6c4'}); P.flush(); }
   else if (d.slot === 'hair'){ P.rect(-8, -6, 16, 13, PX_SKIN[0]); P.rect(-8, -6, 1, 13, PX_SKIN[1]); P.rect(-3, 1, 3, 2, '#ffffff'); P.rect(2, 1, 3, 2, '#ffffff'); P.rect(-2, 1, 2, 2, '#17121c'); P.rect(3, 1, 2, 2, '#17121c'); P.flush(); pxHair(P, w, -6, false); }
+  else if (d.slot === 'face'){ pxFace(P, w, -9); P.flush(true); }
   else if (d.slot === 'wings'){ const rows = PX_WING[(w.key || '').replace('w_', '')] || PX_WING.angel, pal = {'1': w.color[0], '2': w.color[1], '3': w.color[2], y: '#ffe94a'};
     P.map(rows, -rows[0].length + 1, -5, pal, false); P.flush(); P.map(rows, 0, -5, pal, true); P.flush(); }
   else if (d.slot === 'tool'){ P.mapRot(PX_PICK, {'1': w.color[0], '2': w.color[1], '3': w.color[2], n: '#8a5a2b'}, 5.5, 5.5, 0, 0, Math.PI/4); P.flush(); }

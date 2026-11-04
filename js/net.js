@@ -78,7 +78,7 @@ function netLoadPlayer(){
   // v1.3: tas, gems, XP, quest datang dari server
   if (E){ bag = E.bag; bagSlots = E.bagSlots; gems = E.gems; prog = E.prog; }
   selKey = d.selKey || FIST; hot = d.hot || []; if (!hot.length || !hot[0]) initHotbar();
-  worn = Object.assign({wings:null,hat:null,hair:null,shirt:null,pants:null,tool:null}, d.worn || {}); invRows = d.invRows || 0;
+  worn = Object.assign({wings:null,hat:null,hair:null,face:null,shirt:null,pants:null,tool:null}, d.worn || {}); invRows = d.invRows || 0;
   Object.assign(settings, d.settings || {}); if (d.zoom) zoom = d.zoom;
   playerName = account; respawn();
   inGame = false; worlds = {};
@@ -217,8 +217,8 @@ function netOnMessage(m){
 }
 
 // ---------- pemain lain ----------
-const WEAR_SLOTS = ['wings','hat','hair','shirt','pants','tool'];
-function cleanWorn(w){ const o = {wings:null,hat:null,hair:null,shirt:null,pants:null,tool:null}; if (w) for (const s of WEAR_SLOTS) if (WEAR[w[s]] && WEAR[w[s]].slot === s) o[s] = w[s]; return o; }
+const WEAR_SLOTS = ['wings','hat','hair','face','shirt','pants','tool'];
+function cleanWorn(w){ const o = {wings:null,hat:null,hair:null,face:null,shirt:null,pants:null,tool:null}; if (w) for (const s of WEAR_SLOTS) if (WEAR[w[s]] && WEAR[w[s]].slot === s) o[s] = w[s]; return o; }
 function cleanHeld(k){
   if (k === FIST || k === WRENCH) return k;
   const mt = /^([bs])(\d+)$/.exec(k || ''); return mt && BY_ID[+mt[2]] && TEX[+mt[2]] ? k : FIST;

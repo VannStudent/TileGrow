@@ -72,6 +72,10 @@ drain(a); await hitN(a, at(47, 29), 1); o = await tileAfter(a, at(47, 29), 400);
 // 12. pakaian palsu dibuang dari state
 drain(b); S(a, {t: 'pos', s: {x: 50 * 32 + 3, y: 29 * 32 + 2, worn: {hat: 'h_cowboy', evil: {a: 1}, wings: {x: 1}}}}); const pb = await wait(b, 'pos');
 ok('pakaian yang tidak dimiliki / rusak dibuang', pb && JSON.stringify(pb.s.worn) === '{}', JSON.stringify(pb && pb.s.worn));
+// v1.10: kacamata (slot face) yang dimiliki terlihat oleh pemain lain
+S(a, {t: 'chat', text: '/testgive gem 500'}); await sleep(100); S(a, {t: 'buy', key: 'f_monog'}); await sleep(200);
+drain(b); S(a, {t: 'pos', s: {x: 50 * 32 + 3, y: 29 * 32 + 2, worn: {face: 'f_monog'}}}); const pf = await wait(b, 'pos');
+ok('kacamata yang dimiliki terlihat pemain lain (slot face)', pf && pf.s.worn && pf.s.worn.face === 'f_monog', JSON.stringify(pf && pf.s.worn));
 // 13. small lock milik B, A tak bisa pecah
 const c = await open(); S(c, {t: 'login', user: 'bob1', pass: 'secret12'}); ok('login B kedua', (await wait(c, 'auth')).ok); ok('koneksi B lama di-kick', !!(await wait(b, 'kicked')));
 S(c, {t: 'join', name: 'FREE', world: {fg: fgArr, bgw: Array(N).fill(0), trees: [], meta: [], spawn: {x: 50, y: 29}}}); await wait(c, 'world'); posAt(c, 50, 29); await sleep(60);

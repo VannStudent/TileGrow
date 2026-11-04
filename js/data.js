@@ -99,6 +99,16 @@ const CLOTHES = {
   p_brown:  {slot:'pants', name:'Celana Cokelat', price:90,  color:['#7a5230','#4a3018','#a8774b']},
   p_white:  {slot:'pants', name:'Celana Putih',   price:160, color:['#e8ecf2','#a9b2c2','#ffffff']}
 };
+// v1.10: aksesori wajah (slot face) — kacamata & monocle, bisa dipakai bareng topi & rambut.
+// color: [bingkai, bingkai gelap/tangkai, lensa, kilau]
+Object.assign(CLOTHES, {
+  f_sun:    {slot:'face', name:'Kacamata Hitam',   price:150, color:['#1d1a22','#3a3442','#2a2f3e','#8fa2c8'], style:'sunglass'},
+  f_round:  {slot:'face', name:'Kacamata Bulat',   price:110, color:['#d9a640','#8a6420','#cfe6ff','#ffffff'], style:'round'},
+  f_3d:     {slot:'face', name:'Kacamata 3D',      price:90,  color:['#f4f4f4','#b9c3d2','#ffffff','#ffffff'], style:'3d'},
+  f_monog:  {slot:'face', name:'Monocle Emas',     price:400, color:['#f0c43a','#a8851c','#dceaff','#ffffff'], style:'monocle'},
+  f_monos:  {slot:'face', name:'Monocle Perak',    price:250, color:['#b9c2d0','#5d6676','#cfe6ff','#ffffff'], style:'monocle'},
+  f_ski:    {slot:'face', name:'Kacamata Ski',     price:220, color:['#2b2f3a','#d83a3a','#ff9a2e','#fff0a8'], style:'ski'},
+});
 // v1.8: rambut (slot hair) — 4 gaya x 4 warna, dibeli di toko
 const HAIR_STYLES = {cepak: ['Rambut Cepak', 60], rapi: ['Rambut Pendek Rapi', 100], poni: ['Rambut Poni', 140], jabrik: ['Rambut Jabrik', 180]};
 const HAIR_COLORS = {hitam: ['Hitam', ['#2e2630','#17121c','#4f4558']], coklat: ['Cokelat', ['#7a4a26','#4a2a14','#a8703f']],
@@ -200,7 +210,7 @@ const SHOP = [
   {key:'b63', tab:'fun', name:'Papan Catur', desc:'Meja catur sungguhan: pakai kunci inggris untuk main lawan pemain lain atau bot (Mudah/Sedang/Sulit)', price:200, give:[['b63',1]]},
   {key:'b61', tab:'fun', name:'Roda Roulette', desc:'Pukul untuk memutar roda 0–36 (merah/hitam/hijau). Hasilnya dilihat semua orang', price:400, give:[['b61',1]]},
 ];
-const SLOT_NAME = {wings:'Sayap', hat:'Topi', hair:'Rambut', shirt:'Baju', pants:'Celana', tool:'Alat'};
+const SLOT_NAME = {wings:'Sayap', hat:'Topi', hair:'Rambut', face:'Wajah', shirt:'Baju', pants:'Celana', tool:'Alat'};
 // farmable v1.4: paket 3 seed saja (tanpa block), supaya tidak ada untung instan dari membeli lalu langsung memecah.
 // Untung datang dari menanam: tiap pohon memberi 1–3 block, tiap block dipecah memberi gems sesuai rentangnya.
 const FARM_PACKS = [[50,400],[51,900],[52,1800],[53,3000],[54,4500]];

@@ -106,8 +106,8 @@ function handleAct(c, m){
     }
     if (!can) return deny(c, w, i, 'Area ini dikunci.');
     if (om && om.lock && om.lock.owner !== u) return deny(c, w, i, 'Lock milik ' + om.lock.owner + '.');
-    if (om && om.vend && (om.vend.n || om.vend.earned))
-      return deny(c, w, i, om.vend.owner === u ? 'Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.' : 'Vending Machine milik ' + om.vend.owner + '. Pakai kunci inggris untuk membeli.');
+    if (om && om.vend && (om.vend.n || om.vend.earned || om.vend.gemsOld))
+      return deny(c, w, i, om.vend.owner === u ? 'Ambil dulu stok dan hasil penjualan di Vending Machine sebelum memecahnya.' : 'Vending Machine milik ' + om.vend.owner + '. Pakai kunci inggris untuk membeli.');
     if (om && om.chess && om.chess.log.length && !om.chess.res && (om.chess.b || om.chess.bot)) return deny(c, w, i, 'Permainan catur sedang berjalan. Tunggu selesai dulu.');
     if (om && om.display && om.display.key){
       const k = om.display.key; applyTile(w, i, fgId, d.bgw[i], {display: {key: null}}, null); dropsAt(w, tx, ty, [[k, 1]]); return;
@@ -182,7 +182,7 @@ function handleAct(c, m){
     else if (def.wrench === 'sign') mt = {sign: {text: ''}};
     else if (def.wrench === 'door') mt = {door: {name: '', locked: false}};
     else if (def.wrench === 'display') mt = {display: {key: null}};
-    else if (def.wrench === 'vend') mt = {vend: {owner: u, key: null, n: 0, price: 0, earned: 0}};
+    else if (def.wrench === 'vend') mt = {vend: {owner: u, key: null, n: 0, price: 0, earned: 0, per: 'item', cur: 'wl', gemsOld: 0}};
     else if (def.wrench === 'chess') mt = {chess: Chess.newTable()};
     econ.run(E, g => { g.takeItem(key, 1); g.stat('placed', 1); g.questEvent('place', null, 1); if (def.lock === 'world') g.stat('worldLocks', 1); });
     applyTile(w, i, id, d.bgw[i], mt, null);
