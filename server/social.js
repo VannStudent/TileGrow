@@ -101,7 +101,8 @@ function createSocial(S){
                note: String(note || '').replace(/[\u0000-\u001f]/g, '').slice(0, 200), world: c.world, open: true};
     reports.push(r); if (reports.length > 1000) reports.splice(0, reports.length - 1000); write(REP_FILE, reports);
     c.send({t: 'note', text: 'Laporan terkirim. Terima kasih, moderator akan memeriksa.'});
-    for (const o of S.clients) if (o.user && rankOf(o.user) >= RANK.mod) o.send({t: 'staff', text: '[REPORT #' + r.id + '] ' + c.user + ' melaporkan ' + ta.name + ' (' + reason + ')' + (r.note ? ': ' + r.note : '')});
+    const txt = '[REPORT #' + r.id + '] ' + c.user + ' melaporkan ' + ta.name + ' (' + reason + ')' + (r.note ? ': ' + r.note : '');
+    for (const o of S.clients) if (o.user && rankOf(o.user) >= RANK.mod) o.send({t: 'staff', text: txt});
   }
 
   // ---------- trade ----------
@@ -224,14 +225,23 @@ function createSocial(S){
     const devOnly = ['ipban','unipban','setrole','invis','give','items'];
     if (devOnly.includes(cmd) && r < RANK.dev){ say('Perintah ini khusus Developer.'); return true; }
     const name = parts[0], ta = name ? acc(name) : null;
-    const needTarget = () => { if (!name || !ta){ say('Pemain ' + (name || '?') + ' tidak ditemukan.'); return false; } const e = canTouch(c.user, ta.name); if (e){ say(e); return false; } return true; };
+    const needTarget = () => {
+      if (!name || !ta){ say('Pemain ' + (name || '?') + ' tidak ditemukan.'); return false; }
+      const e = canTouch(c.user, ta.name); if (e){ say(e); return false; }
+      return true;
+    };
     const reason = (from) => parts.slice(from).join(' ').slice(0, 120) || '-';
     switch (cmd){
       case 'staffhelp': say(HELP.mod + (r >= RANK.dev ? HELP.dev : '')); return true;
       case 'role': say('Role kamu: ' + ROLE_NAME[roleOf(c.user)]); return true;
-      case 'noclip': c.noclip = !c.noclip; c.send({t: 'staffFx', noclip: c.noclip}); say('Noclip ' + (c.noclip ? 'aktif' : 'mati') + '.'); staffLog(c.user, 'noclip', null, {on: c.noclip}); return true;
+      case 'noclip':
+        c.noclip = !c.noclip; c.send({t: 'staffFx', noclip: c.noclip});
+        say('Noclip ' + (c.noclip ? 'aktif' : 'mati') + '.'); staffLog(c.user, 'noclip', null, {on: c.noclip}); return true;
       case 'zoom': c.fullzoom = !c.fullzoom; c.send({t: 'staffFx', zoom: c.fullzoom}); say('Zoom satu world ' + (c.fullzoom ? 'aktif' : 'mati') + '.'); return true;
-      case 'invis': c.invis = !c.invis; c.send({t: 'staffFx', invis: c.invis}); say('Invisible ' + (c.invis ? 'aktif: pemain lain tidak melihatmu.' : 'mati.')); S.refreshVisibility(c); staffLog(c.user, 'invis', null, {on: c.invis}); return true;
+      case 'invis':
+        c.invis = !c.invis; c.send({t: 'staffFx', invis: c.invis});
+        say('Invisible ' + (c.invis ? 'aktif: pemain lain tidak melihatmu.' : 'mati.'));
+        S.refreshVisibility(c); staffLog(c.user, 'invis', null, {on: c.invis}); return true;
       case 'mute': {
         if (!needTarget()) return true;
         const d = parseDur(parts[1]); if (!d || d === Infinity){ say('Pakai: /mute NAMA 10m|2h|1d [alasan]'); return true; }
@@ -336,7 +346,11 @@ function createSocial(S){
         say(open.length ? open.map(x => '#' + x.id + ' ' + x.from + ' → ' + x.target + ' (' + x.reason + ')' + (x.note ? ': ' + x.note : '') + ' [' + (x.world || '-') + ']').join(' | ') : 'Tidak ada laporan terbuka.');
         return true;
       }
-      case 'close': { const x = reports.find(x => x.id === +name); if (!x){ say('Laporan tidak ditemukan.'); return true; } x.open = false; x.closedBy = c.user; write(REP_FILE, reports); staffLog(c.user, 'closeReport', x.target, {id: x.id}); say('Laporan #' + x.id + ' ditutup.'); return true; }
+      case 'close': {
+        const x = reports.find(x => x.id === +name); if (!x){ say('Laporan tidak ditemukan.'); return true; }
+        x.open = false; x.closedBy = c.user; write(REP_FILE, reports);
+        staffLog(c.user, 'closeReport', x.target, {id: x.id}); say('Laporan #' + x.id + ' ditutup.'); return true;
+      }
     }
     return true;
   }
@@ -345,7 +359,11 @@ function createSocial(S){
   const GIVE_GEMS_MAX = 1000000;
   function allItems(){
     const D = S.econ.D, out = [[D.WRENCH, 'Kunci Inggris']];
-    for (const id in D.BY_ID){ const d = D.BY_ID[id]; if (+id === 0 || +id === 8) continue; out.push(['b' + id, d.name]); if (D.SEEDABLE.includes(+id) || Object.values(D.RECIPES).includes(+id)) out.push(['s' + id, 'Seed ' + d.name]); }
+    for (const id in D.BY_ID){
+      const d = D.BY_ID[id]; if (+id === 0 || +id === 8) continue;
+      out.push(['b' + id, d.name]);
+      if (D.SEEDABLE.includes(+id) || Object.values(D.RECIPES).includes(+id)) out.push(['s' + id, 'Seed ' + d.name]);
+    }
     for (const k in D.WEAR) out.push([k, D.WEAR[k].name]);
     return out;
   }
@@ -384,7 +402,11 @@ function createSocial(S){
       return console.log(r.ok ? r.text : r.err);
     }
     if (cmd === 'unban'){ delete a.ban; S.saveAccounts(); staffLog('SERVER', 'unban', a.name); return console.log(a.name + ' tidak di-ban lagi.'); }
-    if (cmd === 'unipban'){ for (const ip in ipbans) if (ipbans[ip].user === a.name) delete ipbans[ip]; write(BAN_FILE, ipbans); delete a.ban; S.saveAccounts(); return console.log('IP ban ' + a.name + ' dicabut.'); }
+    if (cmd === 'unipban'){
+      for (const ip in ipbans) if (ipbans[ip].user === a.name) delete ipbans[ip];
+      write(BAN_FILE, ipbans); delete a.ban; S.saveAccounts();
+      return console.log('IP ban ' + a.name + ' dicabut.');
+    }
     if (cmd === 'kick'){ const c = S.findOnline(a.name); if (c) S.kickClient(c, 'Kamu di-kick oleh server.'); return console.log(c ? 'Di-kick.' : 'Tidak online.'); }
     console.log('Perintah tidak dikenal. Ketik help.');
   }

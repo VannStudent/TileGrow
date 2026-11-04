@@ -1,4 +1,4 @@
-# TileGrow LAN server (v1.4)
+# TileGrow LAN server (v1.8)
 
 Jalankan di PC host (butuh Node.js 18+, tanpa npm install):
 
@@ -66,3 +66,17 @@ IP ban tidak bisa mengenai PC server sendiri. Di WiFi rumah IP bisa berubah (DHC
     node tests/run-v13.mjs            ekonomi, trade, teman, report, role (49 kasus)
     node tests/run-v13.mjs security   keamanan (33 kasus)
 Kedua perintah menjalankan server sendiri dengan data kosong di port acak.
+
+## Susunan file (v1.8.1)
+| File | Isi |
+|---|---|
+| `server.js` | titik masuk: pemain online, router pesan, HTTP, start/stop |
+| `config.js` | port, folder data, ukuran world, aturan game dari `js/data.js` |
+| `store.js` | baca/tulis akun, world, dan ekonomi pemain |
+| `validate.js` | validasi data dari browser, aturan lock |
+| `ws.js` | WebSocket tanpa paket npm |
+| `auth.js` | daftar & login, batas percobaan |
+| `tiles.js` | pukul/pasang/tanam/wrench, drop item, cek gerakan |
+| `machines.js` | Papan Catur, Vending Machine |
+| `chatcmd.js` | emote, /broadcast, pesan pribadi |
+| `social.js`, `econ.js`, `news.js`, `admin.js` | role & staff, ekonomi, berita, panel role |

@@ -5,58 +5,27 @@
 //   ipbans.json, trade-log.jsonl
 // v1.3: server MEMEGANG tas, gems, XP, quest (server/econ.js memakai aturan dari js/data.js + js/world.js).
 //   Pasang block mengambil item dari tas di server, pecah block menghasilkan drop di server, drop & pickup dibagi semua pemain.
-//   Ditambah role (owner/dev/mod), command staff, teman, report, dan trade aman (server/social.js).
+//   Ditambah role (owner/dev/mod), command staff, teman, report, dan trade aman (server/social.js).// v1.8.1: dipecah per bagian — config.js, store.js, validate.js, ws.js, auth.js, tiles.js, machines.js, chatcmd.js.
+//   File ini tinggal: daftar pemain online, modul sosial/berita/panel, router pesan, HTTP, dan start/stop.
 'use strict';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const os = require('os');
 const readline = require('readline');
-const {loadEcon} = require('./econ');
 const {createSocial, RANK} = require('./social');
 const {createNews} = require('./news');
-const Chess = require('../js/chess.js');
+const {PORT, VERSION, HOST, ROOT, DATA, N, TEST, econ, D, TS} = require('./config');
+const store = require('./store');
+const {readJSON, writeJSON, accounts, saveAccounts, playerFile, worldFile, worlds, validWorldName, loadWorld, flushAll, worldOwner,
+  econs, econOf, saveEcon, flushEcons, pushEcon} = store;
+const {validWorldData, isStr, newWorldData, cleanWorld, cleanWornS} = require('./validate');
+const {wsFrame, wsControl, clientIp, Client, acceptKey} = require('./ws');
 
-const PORT = +process.env.PORT || 8080;
-const VERSION = 'v1.8';
-const HOST = process.env.HOST || '0.0.0.0';
-const ROOT = path.resolve(__dirname, '..');
-const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
-const COLS = 100, ROWS = 60, N = COLS * ROWS;
-const MAX_MSG = 2 * 1024 * 1024;
-const TEST = process.env.TILEGROW_TEST === '1';          // khusus tes otomatis: world dari klien diterima + /testgive
-const econ = loadEcon(ROOT);
-const {D} = econ;
-
-for (const d of [DATA, path.join(DATA, 'players'), path.join(DATA, 'worlds')]) fs.mkdirSync(d, {recursive: true});
-
-// ---------- penyimpanan ----------
-function readJSON(file, fallback){ try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e){ return fallback; } }
-function writeJSON(file, obj){ const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(obj)); fs.renameSync(tmp, file); }
-const ACC_FILE = path.join(DATA, 'accounts.json');
-const accounts = readJSON(ACC_FILE, {});              // lower -> {name, salt, hash, flag, created}
-const saveAccounts = () => writeJSON(ACC_FILE, accounts);
-const playerFile = u => path.join(DATA, 'players', u.toLowerCase() + '.json');
-const worldFile = n => path.join(DATA, 'worlds', n + '.json');
-
-const worlds = new Map();                            // nama -> {data, timer, drops: Map}
-let nextDrop = 1;
-function validWorldName(n){ return typeof n === 'string' && /^[A-Z0-9]{1,16}$/.test(n); }
 const isLocalIp = ip => ip === '127.0.0.1' || ip === '::1' || Object.values(os.networkInterfaces()).some(l => (l || []).some(a => a.address === ip));
-function loadWorld(name){
-  if (worlds.has(name)) return worlds.get(name);
-  const data = readJSON(worldFile(name), null);
-  if (!data) return null;
-  const w = {name, data, timer: null, drops: new Map()};
-  worlds.set(name, w); return w;
-}
-function scheduleWorldSave(w){
-  if (w.timer) return;
-  w.timer = setTimeout(()=>{ w.timer = null; writeJSON(worldFile(w.name), w.data); }, 1500);
-}
-function flushAll(){ for (const w of worlds.values()) if (w.timer){ clearTimeout(w.timer); w.timer = null; writeJSON(worldFile(w.name), w.data); } }
-function worldOwner(data){ for (const [, m] of data.meta) if (m && m.lock && m.lock.type === 'world') return m.lock.owner; return null; }
+
+// ---------- pemain online ----------
+const clients = new Set();
 function listWorlds(){
   const names = new Set(fs.readdirSync(path.join(DATA, 'worlds')).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)));
   for (const n of worlds.keys()) names.add(n);
@@ -65,252 +34,8 @@ function listWorlds(){
     return {name: n, owner: w ? worldOwner(w.data) : null, players: [...clients].filter(c => c.world === n).length};
   });
 }
-
-// ---------- password: scrypt + salt (password asli tidak pernah disimpan) ----------
-function safeEq(a, b){ const A = Buffer.from(a, 'hex'), B = Buffer.from(b, 'hex'); return A.length === B.length && crypto.timingSafeEqual(A, B); }
-const FLAGS = new Set(['ID','MY','SG','PH','TH','VN','JP','KR','CN','IN','US','GB','DE','FR','IT','BR','AU','SA','TR','NL']);
-
-// ---------- validasi data dari browser ----------
-const isByte = v => Number.isInteger(v) && v >= 0 && v < 256;
-function validWorldData(d){
-  return d && Array.isArray(d.fg) && d.fg.length === N && d.fg.every(isByte) && Array.isArray(d.bgw) && d.bgw.length === N && d.bgw.every(isByte)
-    && Array.isArray(d.trees) && Array.isArray(d.meta) && d.spawn && Number.isInteger(d.spawn.x) && Number.isInteger(d.spawn.y);
-}
-// v1.0.1: id block yang dikenal (sama dengan data.js). Block lain ditolak.
-const FG_IDS = new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,21,22,23,24,30,31,32,33,34,41,42,50,51,52,53,54,60,61,62,63]);
-const BG_IDS = new Set([0,40]);
-const PROTECTED = new Set([7, 23]);                    // Dasar & Pintu Utama: tidak bisa dipasang / dihapus pemain
-const LOCK_TYPE = {30: 'world', 31: 'small', 32: 'big', 33: 'huge', 34: 'world'};
-const LOCK_TILES = {small: 10, big: 48, huge: 200}, LOCK_RADIUS = {small: 6, big: 10, huge: 18};
-// jenis pohon: semua seed (SEEDABLE di data.js) + hasil splice (RECIPES), termasuk Bijih Pirus (14)
-const SEED_KINDS = new Set([1,2,3,4,5,6,9,10,11,14,15,16,17,18,41,42,50,51,52,53,54]);
-const isName = v => typeof v === 'string' && /^[A-Za-z0-9]{1,16}$/.test(v);
-const isStr = (v, n) => typeof v === 'string' && v.length <= n;
-// bentuk meta harus cocok dengan block-nya; kalau tidak, data bisa membuat game pemain lain error
-function validMeta(f, i, mt){
-  const need = LOCK_TYPE[f] ? 'lock' : f === 20 ? 'sign' : f === 21 ? 'door' : f === 22 ? 'display' : f === 62 ? 'vend' : f === 63 ? 'chess' : null;
-  if (!need) return mt === null || mt === undefined;
-  if (!mt || typeof mt !== 'object' || Object.keys(mt).length !== 1 || !mt[need] || typeof mt[need] !== 'object') return false;
-  const v = mt[need];
-  if (need === 'sign') return isStr(v.text, 120);
-  if (need === 'door') return isStr(v.name, 24) && typeof v.locked === 'boolean';
-  if (need === 'chess') return Chess.validTable(v);
-  if (need === 'display') return v.key === null || (isStr(v.key, 24) && /^[a-z0-9_]+$/i.test(v.key));
-  if (need === 'vend') return isName(v.owner) && (v.key === null || (econ.isKey(v.key) && v.key !== D.FIST && v.key !== D.WRENCH))
-    && Number.isInteger(v.n) && v.n >= 0 && v.n <= D.STACK && Number.isInteger(v.price) && v.price >= 0 && v.price <= VEND_PRICE_MAX
-    && Number.isInteger(v.earned) && v.earned >= 0 && (v.key !== null || v.n === 0);
-  // lock
-  if (v.type !== LOCK_TYPE[f] || !isName(v.owner) || !Array.isArray(v.access) || v.access.length > 50 || !v.access.every(a => isStr(a, 16))
-      || typeof v.public !== 'boolean' || (v.ignoreAir !== undefined && typeof v.ignoreAir !== 'boolean')) return false;
-  if (v.tiles === null || v.tiles === undefined) return true;
-  if (v.type === 'world' || !Array.isArray(v.tiles) || v.tiles.length > LOCK_TILES[v.type]) return false;
-  const lx = i % COLS, ly = (i / COLS) | 0, r = LOCK_RADIUS[v.type];
-  return v.tiles.every(t => Number.isInteger(t) && t >= 0 && t < N && Math.abs(t % COLS - lx) <= r && Math.abs(((t / COLS) | 0) - ly) <= r);
-}
-function validTree(f, tr){
-  if (f !== 8) return tr === null || tr === undefined;
-  return !!tr && typeof tr === 'object' && SEED_KINDS.has(tr.kind) && typeof tr.t0 === 'number' && isFinite(tr.t0)
-    && (tr.spliced === undefined || typeof tr.spliced === 'boolean') && Object.keys(tr).every(k => k === 'kind' || k === 't0' || k === 'spliced');
-}
-// peta lock: tile -> index lock area yang mengklaimnya, + World Lock (kalau ada)
-function lockIndex(meta){
-  const owner = new Map(); let world = null;
-  for (const [i, m] of meta){
-    if (!m || !m.lock) continue;
-    if (m.lock.type === 'world'){ world = m.lock; continue; }
-    owner.set(i, i);
-    for (const t of m.lock.tiles || []) if (!owner.has(t)) owner.set(t, i);
-  }
-  return {owner, world};
-}
-const hasAccess = (L, u) => L.owner === u || L.access.includes(u) || L.public;
-// aturan sama dengan canBuild() di browser: lock area lebih spesifik dari World Lock
-function canBuildAt(meta, li, i, u){
-  const a = li.owner.get(i);
-  if (a !== undefined){ const m = meta.get(a); if (m && m.lock) return hasAccess(m.lock, u); }
-  return !li.world || hasAccess(li.world, u);
-}
-// cek satu perubahan tile dari pemain u. Hasil: alasan ditolak (string) atau null kalau boleh
-function checkOp(d, meta, trees, li, u, op){
-  const [i, f, b, mt, tr] = op;
-  const om = meta.get(i) || null, ot = trees.get(i) || null;
-  if (d.fg[i] === f && d.bgw[i] === b && JSON.stringify(om) === JSON.stringify(mt) && JSON.stringify(ot) === JSON.stringify(tr)) return null;
-  if (!FG_IDS.has(f) || !BG_IDS.has(b)) return 'block tidak dikenal';
-  if ((PROTECTED.has(d.fg[i]) || PROTECTED.has(f)) && d.fg[i] !== f) return 'block dasar/pintu utama';
-  if (!validMeta(f, i, mt) || !validTree(f, tr)) return 'data block tidak valid';
-  if (!canBuildAt(meta, li, i, u)) return 'area dikunci';
-  const oldLock = om && om.lock, newLock = mt && mt.lock;
-  if (oldLock && oldLock.owner !== u) return 'lock milik orang lain';
-  if (newLock){
-    if (oldLock){ if (newLock.owner !== oldLock.owner || newLock.type !== oldLock.type) return 'lock tidak boleh pindah tangan'; }
-    else {
-      if (newLock.owner !== u) return 'pemilik lock palsu';
-      if (newLock.type === 'world'){
-        for (const [, m] of meta) if (m && m.lock && (m.lock.type === 'world' || m.lock.owner !== u)) return 'world sudah dikunci';
-      } else if (li.owner.has(i)) return 'tile sudah diklaim lock lain';
-    }
-    if (newLock.tiles) for (const t of newLock.tiles){ const o = li.owner.get(t); if (o !== undefined && o !== i) return 'klaim tile bertabrakan'; }
-  }
-  return null;
-}
-// v1.3: world baru dibuat oleh server (generator yang sama dengan browser), jadi isi tambang tidak bisa dipalsukan
-function newWorldData(){ const d = econ.genWorldData(); return {...d, cols: COLS, rows: ROWS, created: Date.now()}; }
-function cleanWorld(d, user){
-  const meta = new Map(), trees = new Map(), ok = e => Array.isArray(e) && Number.isInteger(e[0]) && e[0] >= 0 && e[0] < N;
-  for (const e of d.meta) if (ok(e) && validMeta(d.fg[e[0]], e[0], e[1]) && !(e[1] && e[1].lock && e[1].lock.owner !== user)) meta.set(e[0], e[1]);
-  for (const e of d.trees) if (ok(e) && validTree(d.fg[e[0]], e[1])) trees.set(e[0], e[1]);
-  return {fg: d.fg, bgw: d.bgw, trees: [...trees.entries()], meta: [...meta.entries()], spawn: {x: d.spawn.x, y: d.spawn.y}, cols: COLS, rows: ROWS, created: Date.now()};
-}
-
-// ---------- WebSocket minimal (RFC 6455) ----------
-const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-function wsFrame(str){
-  const p = Buffer.from(str), n = p.length;
-  let h;
-  if (n < 126){ h = Buffer.alloc(2); h[1] = n; }
-  else if (n < 65536){ h = Buffer.alloc(4); h[1] = 126; h.writeUInt16BE(n, 2); }
-  else { h = Buffer.alloc(10); h[1] = 127; h.writeBigUInt64BE(BigInt(n), 2); }
-  h[0] = 0x81; return Buffer.concat([h, p]);
-}
-function wsControl(op, payload){ const p = payload || Buffer.alloc(0); return Buffer.concat([Buffer.from([0x80 | op, p.length]), p]); }
-
-const clients = new Set();
-let nextId = 1;
-// IP asli pemain. Lewat tunnel (ngrok) semua koneksi datang dari 127.0.0.1, jadi pakai X-Forwarded-For,
-// tapi HANYA kalau koneksinya memang dari PC ini (tunnel). Dari luar, header itu bisa dipalsukan, jadi diabaikan.
-function clientIp(req, sock){
-  const raw = String(sock.remoteAddress || '').replace(/^::ffff:/, '');
-  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim().replace(/^::ffff:/, '');
-  if ((raw === '127.0.0.1' || raw === '::1') && fwd && /^[0-9a-f.:]{3,45}$/i.test(fwd)) return fwd;
-  return raw;
-}
-class Client {
-  constructor(sock, ip){
-    this.sock = sock; this.buf = Buffer.alloc(0); this.frag = [];
-    this.id = nextId++; this.user = null; this.flag = 'ID'; this.world = null; this.state = null;
-    this.rate = {t: Date.now(), n: 0}; this.alive = true; this.authBusy = false;
-    this.noclip = false; this.fullzoom = false; this.invis = false; this.frozen = false; this.lastPos = null;
-    this.ip = ip || String(sock.remoteAddress || '').replace(/^::ffff:/, '');
-    sock.on('data', d => this.onData(d));
-    sock.on('close', () => this.onClose());
-    sock.on('error', () => {});
-  }
-  send(obj){ if (this.alive) try { this.sock.write(wsFrame(JSON.stringify(obj))); } catch(e){} }
-  close(){ if (!this.alive) return; try { this.sock.write(wsControl(8)); this.sock.end(); } catch(e){} }
-  onData(d){
-    this.buf = Buffer.concat([this.buf, d]);
-    if (this.buf.length > MAX_MSG + 16) return this.sock.destroy();
-    for (;;){
-      if (this.buf.length < 2) return;
-      const b0 = this.buf[0], b1 = this.buf[1], fin = b0 & 0x80, op = b0 & 0x0f, masked = b1 & 0x80;
-      let len = b1 & 0x7f, off = 2;
-      if (len === 126){ if (this.buf.length < 4) return; len = this.buf.readUInt16BE(2); off = 4; }
-      else if (len === 127){ if (this.buf.length < 10) return; len = Number(this.buf.readBigUInt64BE(2)); off = 10; }
-      if (len > MAX_MSG) return this.sock.destroy();
-      const need = off + (masked ? 4 : 0) + len;
-      if (this.buf.length < need) return;
-      let payload = this.buf.subarray(off + (masked ? 4 : 0), need);
-      if (masked){ const k = this.buf.subarray(off, off + 4); payload = Buffer.from(payload); for (let i = 0; i < payload.length; i++) payload[i] ^= k[i & 3]; }
-      this.buf = this.buf.subarray(need);
-      if (op === 8){ this.close(); return; }
-      if (op === 9){ try { this.sock.write(wsControl(10, payload)); } catch(e){} continue; }
-      if (op === 10) continue;
-      if (op === 1 || op === 0){
-        this.frag.push(payload);
-        if (!fin) continue;
-        const text = Buffer.concat(this.frag).toString('utf8'); this.frag = [];
-        let msg; try { msg = JSON.parse(text); } catch(e){ continue; }
-        if (!this.limit()) continue;
-        try { handle(this, msg); } catch(e){ console.error('handler error', e); }
-      }
-    }
-  }
-  limit(){ const now = Date.now(); if (now - this.rate.t > 1000){ this.rate = {t: now, n: 0}; } return ++this.rate.n <= 300; }
-  onClose(){ if (!this.alive) return; this.alive = false; leaveWorld(this); clients.delete(this); }
-}
-
 function inWorld(name){ return [...clients].filter(c => c.world === name); }
 function broadcast(world, obj, except){ const f = wsFrame(JSON.stringify(obj)); for (const c of clients) if (c.world === world && c !== except && c.alive) try { c.sock.write(f); } catch(e){} }
-// v1.7: emote (/wave, /dance, ...): animasi karakter + ikon di atas kepala, dilihat semua pemain di world yang sama.
-const EMOTES = new Set(['wave', 'dance', 'cry', 'laugh', 'angry', 'love', 'sleep', 'cheer']);
-const EMOTE_ALIAS = {lambai: 'wave', joget: 'dance', nangis: 'cry', ketawa: 'laugh', marah: 'angry', cinta: 'love', tidur: 'sleep', hore: 'cheer'};
-function emoteCmd(c, text){
-  let cmd = text.slice(1).trim().split(/\s+/)[0].toLowerCase(); cmd = EMOTE_ALIAS[cmd] || cmd;
-  if (cmd === 'emotes' || cmd === 'emote'){ c.send({t: 'note', text: 'Emote: /' + [...EMOTES].join(', /') + '. Bahasa Indonesia juga bisa: /lambai, /joget, /nangis, /ketawa, /marah, /cinta, /tidur, /hore.'}); return true; }
-  if (!EMOTES.has(cmd)) return false;
-  const now = Date.now(); c.emT = (c.emT || []).filter(t => now - t < 10e3);
-  if (c.emT.length >= 5){ c.send({t: 'note', text: 'Terlalu cepat. Tunggu sebentar.'}); return true; }
-  c.emT.push(now);
-  const msg = {t: 'emote', id: c.id, e: cmd};
-  for (const o of clients) if (o.world === c.world && (o === c || visibleTo(c, o))) o.send(msg);
-  return true;
-}
-// v1.6: /broadcast pesan — ke SEMUA pemain online di semua world, bayar gems.
-// Harga 1000, naik +1000 untuk setiap broadcast lain dalam 10 menit terakhir (maks 5000). Jeda 2 menit per pemain, maks 120 huruf.
-const fmt = n => Number(n).toLocaleString('id-ID');
-const BC = {base: 1000, step: 1000, max: 5000, window: 10 * 60e3, cooldown: 2 * 60e3, maxLen: 120};
-const bcLog = [];                                       // waktu broadcast (semua pemain)
-function bcPrice(now){ while (bcLog.length && now - bcLog[0] > BC.window) bcLog.shift(); return Math.min(BC.max, BC.base + BC.step * bcLog.length); }
-function broadcastCmd(c, text){
-  const parts = text.slice(1).trim().split(/\s+/), cmd = (parts.shift() || '').toLowerCase();
-  if (cmd !== 'broadcast' && cmd !== 'bc') return false;
-  const me = accounts[c.user.toLowerCase()]; if (!me) return true;
-  const note = t => { c.send({t: 'note', text: t}); return true; };
-  const now = Date.now(), price = bcPrice(now);
-  const body = parts.join(' ').replace(/[\u0000-\u001f]/g, '').trim();
-  if (!body) return note('Pakai: /broadcast pesan (maks ' + BC.maxLen + ' huruf). Harga sekarang: ' + fmt(price) + ' gems. Tampil ke semua pemain online di semua world.');
-  if (body.length > BC.maxLen) return note('Broadcast maksimal ' + BC.maxLen + ' huruf (pesanmu ' + body.length + ').');
-  const mu = social.muteInfo(me); if (mu) return note('Kamu di-mute, tidak bisa broadcast.');
-  const wait = Math.ceil(((c.lastBc || me.lastBc || 0) + BC.cooldown - now) / 1000);
-  if (wait > 0) return note('Tunggu ' + wait + ' detik lagi sebelum broadcast berikutnya.');
-  if (social.inTrade(c.user)) return note('Selesaikan trade dulu.');
-  const E = econOf(c.user);
-  if (E.gems < price) return note('Gems tidak cukup. Broadcast sekarang ' + fmt(price) + ' gems (kamu punya ' + fmt(E.gems) + ').');
-  E.gems -= price; saveEcon(c.user);
-  bcLog.push(now); c.lastBc = me.lastBc = now;
-  const msg = {t: 'bcast', name: c.user, display: social.display(c.user), role: social.roleOf(c.user), world: c.world || '', text: body};
-  for (const o of clients) if (o.user) o.send(msg);
-  console.log('[broadcast]', c.user, '(' + price + ' gems):', body);
-  pushEcon(c, [['act', 'Broadcast terkirim ke semua pemain (-' + fmt(price) + ' gems). Harga berikutnya: ' + fmt(bcPrice(now)) + ' gems.']]);
-  return true;
-}
-// v1.5: pesan pribadi /msg NAMA pesan, /r pesan (balas), /ignore NAMA (toggle), /ignore (daftar)
-function privateMsg(c, text){
-  const parts = text.slice(1).trim().split(/\s+/), cmd = (parts.shift() || '').toLowerCase();
-  if (!['msg', 'pm', 'r', 'ignore', 'unignore'].includes(cmd)) return false;
-  const me = accounts[c.user.toLowerCase()]; if (!me) return true;
-  const note = t => { c.send({t: 'note', text: t}); return true; };   // selalu true: command sudah ditangani
-  if (cmd === 'ignore' || cmd === 'unignore'){
-    me.ignore = Array.isArray(me.ignore) ? me.ignore : [];
-    if (!parts[0]) return note(me.ignore.length ? 'Kamu mengabaikan: ' + me.ignore.join(', ') + '. /unignore NAMA untuk membuka.' : 'Daftar ignore kosong. Pakai: /ignore NAMA');
-    const ta = accounts[parts[0].toLowerCase()]; if (!ta) return note('Pemain ' + parts[0] + ' tidak ditemukan.');
-    if (ta.name === me.name) return note('Tidak bisa ignore diri sendiri.');
-    const k = me.ignore.indexOf(ta.name), off = cmd === 'unignore' || k >= 0;
-    if (off){ if (k >= 0) me.ignore.splice(k, 1); } else { if (me.ignore.length >= 100) return note('Daftar ignore penuh (100).'); me.ignore.push(ta.name); }
-    saveAccounts();
-    return note(off ? ta.name + ' tidak diabaikan lagi.' : 'Kamu mengabaikan ' + ta.name + '. Pesan pribadinya tidak akan sampai. Ketik /ignore ' + ta.name + ' lagi untuk membuka.');
-  }
-  let name, body;
-  if (cmd === 'r'){ name = c.lastPm; body = parts.join(' '); if (!name) return note('Belum ada pesan pribadi untuk dibalas.'); }
-  else { name = parts.shift(); body = parts.join(' '); }
-  if (!name || !body) return note(cmd === 'r' ? 'Pakai: /r pesan' : 'Pakai: /msg NAMA pesan');
-  const mu = social.muteInfo(me);
-  if (mu) return note('Kamu di-mute sampai ' + new Date(mu.until).toLocaleTimeString('id-ID') + '.');
-  const now = Date.now(); c.pmRate = (c.pmRate || []).filter(t => now - t < 10000);
-  if (c.pmRate.length >= 6) return note('Terlalu cepat. Tunggu sebentar sebelum kirim pesan pribadi lagi.');
-  const o = findOnline(name);
-  if (!o || !visibleTo(o, c)) return note('Pemain ' + name + ' sedang tidak online.');
-  if (o === c) return note('Tidak bisa mengirim pesan ke diri sendiri.');
-  c.pmRate.push(now);
-  const ta = accounts[o.user.toLowerCase()] || {};
-  // diabaikan penerima: pengirim tetap melihat "terkirim" (supaya tidak ketahuan diblok), pesan tidak dikirim. Staff tidak bisa di-ignore.
-  const ignored = Array.isArray(ta.ignore) && ta.ignore.includes(me.name) && social.rankOf(c.user) < social.RANK.mod;
-  c.send({t: 'pm', dir: 'to', name: o.user, display: social.display(o.user), text: body});
-  if (ignored) return true;
-  o.lastPm = c.user;
-  o.send({t: 'pm', dir: 'from', name: c.user, display: social.display(c.user), role: social.roleOf(c.user), text: body});
-  return true;
-}
 function findOnline(name){ const k = String(name || '').toLowerCase(); for (const c of clients) if (c.user && c.user.toLowerCase() === k) return c; return null; }
 // pemain invisible (dev /invis) tidak dikirim ke pemain biasa
 const visibleTo = (o, viewer) => !o.invis || social.rankOf(viewer.user) >= RANK.mod;
@@ -335,420 +60,13 @@ function refreshVisibility(c){
 }
 function kickClient(o, reason){ o.send({t: 'kicked', reason}); leaveWorld(o); o.user = null; setTimeout(() => o.close(), 50); }
 
-function cleanWornS(w){ const o = {}; if (w && typeof w === 'object') for (const k of ['wings','hat','hair','shirt','pants','tool']) if (isStr(w[k], 24)) o[k] = w[k]; return o; }
-
-// ---------- ekonomi per pemain (dipegang server) ----------
-const econs = new Map();                              // lower -> {bag, bagSlots, gems, prog}
-const econTimers = new Map();
-function econOf(user){
-  const k = String(user || '').toLowerCase();
-  if (econs.has(k)) return econs.get(k);
-  const f = readJSON(playerFile(user), null);
-  let E;
-  if (f && f.econ && Array.isArray(f.econ.bag)) E = f.econ;
-  else {
-    E = econ.newEcon();
-    // pindahan dari v1.2 (dulu browser yang menyimpan): progres level/quest dipakai, tas & gems dibatasi supaya tidak bisa dicurangi
-    if (f && f.v === 10 && f.prog && typeof f.prog === 'object' && Number.isInteger(f.prog.level)){
-      E.prog = Object.assign(E.prog, {level: Math.min(f.prog.level, 30), xp: 0, bestiary: Array.isArray(f.prog.bestiary) ? f.prog.bestiary.slice(0, 50) : []});
-      if (Array.isArray(f.bag)) for (const sl of f.bag) if (sl && econ.isKey(sl.key) && Number.isInteger(sl.n) && sl.n > 0 && !E.bag.some(x => x.key === sl.key) && E.bag.length < E.bagSlots) E.bag.push({key: sl.key, n: Math.min(sl.n, D.STACK)});
-      if (Number.isInteger(f.gems)) E.gems = Math.max(0, Math.min(f.gems, 5000));
-      if (Number.isInteger(f.bagSlots)) E.bagSlots = Math.max(16, Math.min(64, f.bagSlots));
-      console.log('[econ] migrasi save v1.2', user);
-    }
-  }
-  econs.set(k, E); return E;
-}
-function saveEcon(user){
-  const k = String(user).toLowerCase();
-  if (econTimers.has(k)) return;
-  econTimers.set(k, setTimeout(() => { econTimers.delete(k); writePlayer(user); }, 1000));
-}
-function writePlayer(user){
-  const k = String(user).toLowerCase(), E = econs.get(k); if (!E) return;
-  const f = readJSON(playerFile(user), {}) || {};
-  f.econ = E; f.v = 13;
-  writeJSON(playerFile(user), f);
-}
-function flushEcons(){ for (const [k, t] of econTimers){ clearTimeout(t); econTimers.delete(k); const a = accounts[k]; if (a) writePlayer(a.name); } }
-// kirim keadaan ekonomi terbaru ke pemain + pesan (naik level, quest selesai, dll)
-function pushEcon(c, extra){
-  const E = econOf(c.user);
-  c.send({t: 'econ', bag: E.bag, bagSlots: E.bagSlots, gems: E.gems, prog: E.prog, msgs: [...econ.out.splice(0), ...(extra || [])]});
-}
-
-// ---------- drop item (dibagi semua pemain di world) ----------
-const DROP_MAX = 400;
-function spawnDropS(w, x, y, key, n, lockMs, owner){
-  if (w.drops.size >= DROP_MAX){ const first = w.drops.keys().next().value; w.drops.delete(first); broadcast(w.name, {t: 'dropDel', id: first}); }
-  const d = {id: nextDrop++, x: Math.round(x), y: Math.round(y), key, n, t: Date.now(), lock: Date.now() + (lockMs || 250), owner: owner || null};
-  w.drops.set(d.id, d);
-  broadcast(w.name, {t: 'dropAdd', d});
-  return d;
-}
-function dropsAt(w, tx, ty, list, lockMs){ for (const [k, n] of list) spawnDropS(w, tx * TS + TS / 2 + (Math.random() - .5) * 14, ty * TS + TS / 2, k, n, lockMs); }
-const TS = D.TS;
-// drop yang tidak diambil hilang setelah 10 menit
-setInterval(() => { const now = Date.now(); for (const w of worlds.values()) for (const [id, d] of w.drops) if (now - d.t > 600e3){ w.drops.delete(id); broadcast(w.name, {t: 'dropDel', id}); } }, 30e3).unref();
-
-// ---------- cek gerakan (anti teleport / terbang / tembus) ----------
-// server tidak menjalankan fisika penuh; cukup batas kecepatan + tidak boleh berada di dalam block padat.
-// Staff dengan /noclip dibebaskan.
-const MAX_SPEED = 900;                                 // px/dtk (jalan 230, jatuh 430, lompat sayap ~900)
-function insideSolid(d, x, y, u){
-  let meta = null, li = null;                          // dihitung hanya kalau menyentuh House Entrance
-  const x0 = Math.floor((x + 3) / TS), x1 = Math.floor((x + 23) / TS), y0 = Math.floor((y + 3) / TS), y1 = Math.floor((y + 27) / TS);
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++){
-    if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) return true;
-    const id = d.fg[ty * COLS + tx];
-    if (id === 21){ continue; }                           // pintu: bisa dilewati (pintu terkunci dicek di browser)
-    if (id === 24){                                      // House Entrance: padat bagi yang tidak punya akses lock
-      if (!meta){ meta = new Map(d.meta); li = lockIndex(meta); }
-      if (!canBuildAt(meta, li, ty * COLS + tx, u)) return true;
-      continue;
-    }
-    if (econ.solid(id)) return true;
-  }
-  return false;
-}
-function checkMove(c, w, s){
-  if (c.noclip) return true;
-  const now = Date.now(), last = c.lastPos;
-  if (c.frozen && last) return false;
-  if (insideSolid(w.data, s.x, s.y, c.user)) return false;
-  if (last){
-    const dt = Math.max(.05, (now - last.t) / 1000), dist = Math.hypot(s.x - last.x, s.y - last.y);
-    if (dist > MAX_SPEED * dt + TS * 2) return false;
-  }
-  return true;
-}
-// jarak pemain ke tile (REACH di browser = 2 tile; server memberi kelonggaran 1 tile karena lag)
-function inReachS(c, tx, ty){
-  if (c.noclip || !c.state) return true;
-  const px = Math.floor((c.state.x + 13) / TS), py = Math.floor((c.state.y + 15) / TS);
-  return Math.abs(tx - px) <= D.REACH + 1 && Math.abs(ty - py) <= D.REACH + 1;
-}
-
-// ---------- batas percobaan login (anti tebak password) ----------
-// 5 gagal dalam 60 dtk (per IP atau per username) = diblokir 60 dtk. Akun baru maks 35 per IP per jam
-// (banyak pemain bisa berbagi satu IP: satu WiFi, atau kuota HP yang IP-nya dipakai bersama).
-const FAIL_MAX = 5, FAIL_WINDOW = 60000, FAIL_BLOCK = 60000, REG_MAX = 35, REG_WINDOW = 3600000;
-const fails = new Map(), regs = new Map();
-function blockedFor(key){ const f = fails.get(key); return f && f.until > Date.now() ? Math.ceil((f.until - Date.now()) / 1000) : 0; }
-function noteFail(key){
-  const now = Date.now(), f = fails.get(key) || {n: 0, t: now, until: 0};
-  if (now - f.t > FAIL_WINDOW){ f.n = 0; f.t = now; }
-  if (++f.n >= FAIL_MAX){ f.until = now + FAIL_BLOCK; f.n = 0; f.t = now; }
-  fails.set(key, f);
-}
-setInterval(()=>{ const now = Date.now();
-  for (const [k, f] of fails) if (f.until < now && now - f.t > FAIL_WINDOW) fails.delete(k);
-  for (const [k, r] of regs) if (now - r.t > REG_WINDOW) regs.delete(k); }, 60000).unref();
-// scrypt async: login tidak lagi membekukan server untuk pemain lain
-const scryptAsync = (pass, salt) => new Promise((res, rej) => crypto.scrypt(String(pass), salt, 32, (e, k) => e ? rej(e) : res(k.toString('hex'))));
-
-
-async function handleAuth(c, m, t){
-  const user = String(m.user || '').trim(), pass = String(m.pass || '');
-  if (!/^[A-Za-z0-9]{3,16}$/.test(user)) return c.send({t: 'auth', ok: false, err: 'Username 3–16 karakter, hanya huruf dan angka.'});
-  if (pass.length > 200) return c.send({t: 'auth', ok: false, err: 'Password terlalu panjang.'});
-  const key = user.toLowerCase(), flag = FLAGS.has(m.flag) ? m.flag : null;
-  const wait = Math.max(blockedFor('ip:' + c.ip), blockedFor('u:' + key));
-  if (wait) return c.send({t: 'auth', ok: false, err: 'Terlalu banyak percobaan gagal. Coba lagi dalam ' + wait + ' detik.'});
-  const ipb = social.loginBlock('', c.ip); if (ipb) return c.send({t: 'auth', ok: false, err: ipb});
-  if (t === 'register'){
-    if (pass.length < 6) return c.send({t: 'auth', ok: false, err: 'Password minimal 6 karakter.'});
-    if (accounts[key]) return c.send({t: 'auth', ok: false, err: 'Username sudah dipakai di server ini.'});
-    const r = regs.get(c.ip) || {n: 0, t: Date.now()};
-    if (r.n >= REG_MAX && !TEST) return c.send({t: 'auth', ok: false, err: 'Terlalu banyak akun baru dari perangkat ini. Coba lagi nanti.'});
-    const salt = crypto.randomBytes(16).toString('hex'), hash = await scryptAsync(pass, salt);
-    if (accounts[key]) return c.send({t: 'auth', ok: false, err: 'Username sudah dipakai di server ini.'});
-    accounts[key] = {name: user, salt, hash, flag: flag || 'ID', created: Date.now()};
-    saveAccounts(); r.n++; regs.set(c.ip, r);
-  }
-  const a = accounts[key];
-  if (!a){ noteFail('ip:' + c.ip); return c.send({t: 'auth', ok: false, err: 'Akun tidak ditemukan di server ini.'}); }
-  if (t === 'login' && !safeEq(await scryptAsync(pass, a.salt), a.hash)){
-    noteFail('ip:' + c.ip); noteFail('u:' + key);
-    return c.send({t: 'auth', ok: false, err: 'Password salah.'});
-  }
-  if (!c.alive) return;
-  const banned = social.loginBlock(a.name, c.ip); if (banned) return c.send({t: 'auth', ok: false, err: banned});
-  fails.delete('u:' + key);
-  // satu akun hanya boleh login di satu perangkat
-  for (const o of clients) if (o !== c && o.user && o.user.toLowerCase() === key) kickClient(o, 'Akun ini baru saja login di perangkat lain.');
-  if (flag && flag !== a.flag) a.flag = flag;
-  a.lastIp = c.ip; a.lastSeen = Date.now(); saveAccounts();
-  c.user = a.name; c.flag = a.flag;
-  const f = readJSON(playerFile(a.name), null) || {};
-  const E = econOf(a.name);
-  c.send({t: 'auth', ok: true, user: a.name, flag: a.flag, role: social.roleOf(a.name), display: social.display(a.name),
-          player: f.client || null, econ: {bag: E.bag, bagSlots: E.bagSlots, gems: E.gems, prog: E.prog}, isNew: t === 'register'});
-  c.send({t: 'friends', ...social.friendList(a.name)});
-  c.send({t: 'news', ...news.get(), canEdit: social.rankOf(a.name) >= RANK.dev});
-  for (const fr of social.friendList(a.name).friends){ const fc = findOnline(fr.name); if (fc) social.pushFriends(fr.name); }
-}
-
-// ---------- aksi ekonomi di tile (pengganti 'ops' untuk pemain) ----------
-// browser mengirim maksud (pukul/pasang/tanam/...); server mengecek, mengubah world, menghitung drop/XP, lalu
-// mengirim perubahan tile ke semua pemain + keadaan tas ke pemain itu.
-const dmgS = new Map();                                // world:idx -> {n, t}
-function applyTile(w, i, f, b, mt, tr){
-  const d = w.data, meta = new Map(d.meta), trees = new Map(d.trees);
-  d.fg[i] = f; d.bgw[i] = b;
-  if (mt) meta.set(i, mt); else meta.delete(i);
-  if (tr) trees.set(i, tr); else trees.delete(i);
-  d.meta = [...meta.entries()]; d.trees = [...trees.entries()];
-  scheduleWorldSave(w);
-  broadcast(w.name, {t: 'ops', from: 0, ops: [[i, f, b, mt || null, tr || null]]});
-}
-function tileState(w, i){ const d = w.data; return [i, d.fg[i], d.bgw[i], new Map(d.meta).get(i) || null, new Map(d.trees).get(i) || null]; }
-function deny(c, w, i, why){ c.send({t: 'ops', from: 0, ops: [tileState(w, i)], denied: 1, why}); }
-
-function handleAct(c, m){
-  const w = worlds.get(c.world); if (!w || c.frozen) return;
-  const i = m.i; if (!Number.isInteger(i) || i < 0 || i >= N) return;
-  const tx = i % COLS, ty = (i / COLS) | 0, d = w.data, meta = new Map(d.meta), trees = new Map(d.trees), li = lockIndex(meta);
-  if (!inReachS(c, tx, ty)) return deny(c, w, i, 'Terlalu jauh.');
-  const E = econOf(c.user), u = c.user;
-  const can = canBuildAt(meta, li, i, u) || (c.noclip && social.rankOf(u) >= RANK.dev);
-  const fgId = d.fg[i], om = meta.get(i) || null;
-  if (m.a === 'hit'){
-    // pukul: pohon matang = panen; block depan; kalau kosong, dinding belakang
-    const isBg = fgId === 0;
-    const id = isBg ? d.bgw[i] : fgId;
-    if (!id) return;
-    if (PROTECTED.has(id)) return;
-    // v1.4: Dadu / Roulette: pukulan pertama = acak angka (dihitung di sini, siapa pun boleh); pukul lagi saat masih berputar = merusak
-    const rd = !isBg && D.BY_ID[id];
-    if (rd && rd.roll){
-      const rk = c.world + ':' + i, last = rollS.get(rk) || 0;
-      if (Date.now() - last >= ROLL_BUSY_MS){
-        rollS.set(rk, Date.now());
-        const v = rd.roll === 'dice' ? 1 + crypto.randomInt(6) : crypto.randomInt(37);
-        return broadcast(c.world, {t: 'roll', i, kind: rd.roll, v, by: social.display(u)});
-      }
-    }
-    if (!can) return deny(c, w, i, 'Area ini dikunci.');
-    if (om && om.lock && om.lock.owner !== u) return deny(c, w, i, 'Lock milik ' + om.lock.owner + '.');
-    if (om && om.vend && (om.vend.n || om.vend.earned))
-      return deny(c, w, i, om.vend.owner === u ? 'Ambil dulu stok dan gems di Vending Machine sebelum memecahnya.' : 'Vending Machine milik ' + om.vend.owner + '. Pakai kunci inggris untuk membeli.');
-    if (om && om.chess && om.chess.log.length && !om.chess.res && (om.chess.b || om.chess.bot)) return deny(c, w, i, 'Permainan catur sedang berjalan. Tunggu selesai dulu.');
-    if (om && om.display && om.display.key){
-      const k = om.display.key; applyTile(w, i, fgId, d.bgw[i], {display: {key: null}}, null); dropsAt(w, tx, ty, [[k, 1]]); return;
-    }
-    if (fgId === 8){
-      const tr = trees.get(i); if (!tr) return;
-      if (Date.now() - tr.t0 < (D.GROW_MS[tr.kind] || 0) - 1500) return deny(c, w, i, 'Pohon belum siap dipanen.');
-      const h = econ.rollHarvest(tr.kind);
-      applyTile(w, i, 0, d.bgw[i], null, null); dropsAt(w, tx, ty, h.drops);
-      econ.run(E, g => { g.stat('harvested', 1); g.questEvent('harvest', null, 1); g.addXP(h.xp); });
-      saveEcon(u); return pushEcon(c);
-    }
-    const def = D.BY_ID[id]; if (!def) return;
-    const tool = c.state && c.state.worn && c.state.worn.tool && E.bag.some(s => s.key === c.state.worn.tool);
-    const base = def.lock ? 5 : def.hits, need = tool ? Math.max(1, base - 1) : base;
-    const k = c.world + ':' + (isBg ? 'g' : 'f') + i, dd = dmgS.get(k) || {n: 0, t: 0};
-    if (Date.now() - dd.t > 2400) dd.n = 0;
-    // batas kecepatan pukul (browser: 1 pukulan / 0,17 dtk)
-    if (Date.now() - (c.lastHit || 0) < 120) return;
-    c.lastHit = Date.now();
-    dd.n++; dd.t = Date.now(); dmgS.set(k, dd);
-    if (dd.n < need) return;
-    dmgS.delete(k);
-    const r = econ.rollBreak(id, isBg);
-    if (isBg) applyTile(w, i, fgId, 0, om, trees.get(i) || null); else applyTile(w, i, 0, d.bgw[i], null, null);
-    dropsAt(w, tx, ty, r.drops);
-    econ.run(E, g => { if (isBg) g.questEvent('bgbreak', null, 1); if (r.ore){ g.stat('ores', 1); g.questEvent('ore', null, 1); } g.stat('broken', 1); g.questEvent('break', null, 1); g.addXP(r.xp); });
-    saveEcon(u); return pushEcon(c);
-  }
-  if (m.a === 'place' || m.a === 'seed'){
-    const key = String(m.key || ''); if (!econ.isKey(key) || key[0] !== (m.a === 'place' ? 'b' : 's')) return;
-    const id = +key.slice(1), def = D.BY_ID[id];
-    if (!E.bag.some(s => s.key === key && s.n > 0)) return deny(c, w, i, 'Item tidak ada di tas.');
-    if (!can) return deny(c, w, i, 'Area ini dikunci.');
-    if (m.a === 'seed'){
-      if (fgId === 8){
-        const tr = trees.get(i); if (!tr) return;
-        if (tr.spliced) return deny(c, w, i, 'Pohon ini sudah hasil splice.');
-        const out = D.recipe(tr.kind, id); if (!out) return deny(c, w, i, D.BY_ID[tr.kind].name + ' + ' + def.name + ' tidak menghasilkan apa-apa.');
-        econ.run(E, g => { g.takeItem(key, 1); g.discoverRecipe(tr.kind, id, out); g.stat('spliced', 1); g.questEvent('splice', null, 1); g.addXP(5); });
-        applyTile(w, i, 8, d.bgw[i], null, {kind: out, t0: Date.now(), spliced: true});
-        saveEcon(u); return pushEcon(c);
-      }
-      if (fgId !== 0) return deny(c, w, i, '');
-      const below = ty + 1 < ROWS ? d.fg[i + COLS] : 7, bd = D.BY_ID[below];
-      if (!bd || !bd.solid || bd.deco) return deny(c, w, i, 'Seed harus ditanam di atas block padat.');
-      econ.run(E, g => { g.takeItem(key, 1); g.questEvent('plant', null, 1); });
-      applyTile(w, i, 8, d.bgw[i], null, {kind: id, t0: Date.now()});
-      saveEcon(u); return pushEcon(c);
-    }
-    // pasang block
-    if (!def || PROTECTED.has(id) || !FG_IDS.has(id) && !def.bg) return;
-    if (def.bg){
-      if (d.bgw[i]) return deny(c, w, i, '');
-      econ.run(E, g => { g.takeItem(key, 1); g.stat('placed', 1); g.questEvent('place', null, 1); });
-      applyTile(w, i, fgId, id, om, trees.get(i) || null); saveEcon(u); return pushEcon(c);
-    }
-    if (fgId !== 0) return deny(c, w, i, '');
-    // tidak boleh memasang block padat di posisi pemain lain
-    if (def.solid || def.entrance) for (const o of inWorld(c.world)) if (o.state && insideSolidAt(o.state, tx, ty)) return deny(c, w, i, 'Ada pemain di situ.');
-    let mt = null;
-    if (def.lock){
-      if (def.lock === 'world'){
-        for (const [, x] of meta) if (x && x.lock && (x.lock.type === 'world' || x.lock.owner !== u)) return deny(c, w, i, 'World ini sudah dikunci atau ada lock milik orang lain.');
-      } else if (li.owner.has(i)) return deny(c, w, i, 'Tile ini sudah diklaim lock lain.');
-      mt = {lock: {type: def.lock, owner: u, access: [], public: false, ignoreAir: false, tiles: def.lock === 'world' ? null : claimTilesS(d, meta, i, def.lock, false)}};
-    }
-    else if (def.wrench === 'sign') mt = {sign: {text: ''}};
-    else if (def.wrench === 'door') mt = {door: {name: '', locked: false}};
-    else if (def.wrench === 'display') mt = {display: {key: null}};
-    else if (def.wrench === 'vend') mt = {vend: {owner: u, key: null, n: 0, price: 0, earned: 0}};
-    else if (def.wrench === 'chess') mt = {chess: Chess.newTable()};
-    econ.run(E, g => { g.takeItem(key, 1); g.stat('placed', 1); g.questEvent('place', null, 1); if (def.lock === 'world') g.stat('worldLocks', 1); });
-    applyTile(w, i, id, d.bgw[i], mt, null);
-    saveEcon(u); return pushEcon(c);
-  }
-  if (m.a === 'meta'){
-    // simpan dialog wrench (papan, pintu, kotak pajang, lock)
-    const mt = m.meta; if (!om || !mt || typeof mt !== 'object') return;
-    if (om.vend) return deny(c, w, i, '');               // vending diatur lewat aksi 'vend' (stok & gems dihitung server)
-    if (om.chess) return deny(c, w, i, '');              // catur diatur lewat aksi 'chess' (langkah dicek server)
-    if (!validMeta(fgId, i, mt)) return deny(c, w, i, 'Data tidak valid.');
-    if (om.lock){
-      if (om.lock.owner !== u) return deny(c, w, i, 'Hanya pemilik lock.');
-      const L = mt.lock; if (!L || L.type !== om.lock.type || L.owner !== om.lock.owner) return deny(c, w, i, 'Lock tidak boleh pindah tangan.');
-      L.access = L.access.filter(n => isName(n) && n !== u).slice(0, 50);
-      L.tiles = L.type === 'world' ? null : claimTilesS(d, meta, i, L.type, !!L.ignoreAir);
-    } else if (!can) return deny(c, w, i, 'Area ini dikunci.');
-    if (om.display){
-      const nk = mt.display.key, ok = om.display.key;
-      if (nk !== ok){
-        if (nk && !E.bag.some(s => s.key === nk && s.n > 0)) return deny(c, w, i, 'Item tidak ada di tas.');
-        if (nk && (nk === D.FIST || nk === D.WRENCH || !econ.isKey(nk))) return deny(c, w, i, '');
-        if (ok && econ.fits(E, [[ok, 1]], nk ? [[nk, 1]] : [])) return deny(c, w, i, 'Tas penuh.');
-        econ.run(E, g => { if (ok) g.addItem(ok, 1); if (nk) g.takeItem(nk, 1); });
-        saveEcon(u); pushEcon(c);
-      }
-    }
-    return applyTile(w, i, fgId, d.bgw[i], mt, null);
-  }
-}
-const rollS = new Map(), ROLL_BUSY_MS = 1400;
-// ---------- v1.4: Vending Machine ----------
-// stok disimpan di mesin; pembeli bayar gems, gems masuk ke kas mesin sampai diambil pemilik.
-// Semua dihitung di sini, jadi browser tidak bisa memalsukan stok, harga, atau kas.
-const VEND_PRICE_MAX = 100000;
-// v1.7: Papan Catur. Semua langkah dicek di server (js/chess.js); bot dihitung di server juga.
-const chessBusy = new Set();
-function handleChess(c, m){
-  const w = worlds.get(c.world); if (!w || c.frozen) return;
-  const i = m.i; if (!Number.isInteger(i) || i < 0 || i >= N) return;
-  const d = w.data, meta = new Map(d.meta), om = meta.get(i);
-  if (d.fg[i] !== 63 || !om || !om.chess) return;
-  const tx = i % COLS, ty = (i / COLS) | 0;
-  const op = String(m.op || '');
-  // duduk / mulai bot / ulang harus dekat papan; yang sudah duduk boleh melangkah dari mana saja di world ini
-  if ((op === 'sit' || op === 'bot' || op === 'reset') && !inReachS(c, tx, ty)) return c.send({t: 'note', text: 'Terlalu jauh dari Papan Catur.'});
-  const k = c.world + ':' + i; if (chessBusy.has(k) && op === 'move') return c.send({t: 'note', text: 'Bot sedang berpikir...'});
-  const canAdmin = canBuildAt(meta, lockIndex(meta), i, c.user);
-  const r = Chess.tableAct(om.chess, c.user, op, m, canAdmin);
-  if (r.err) return c.send({t: 'note', text: r.err});
-  applyTile(w, i, 63, d.bgw[i], {chess: r.T}, null);
-  if (r.msg) broadcast(c.world, {t: 'chessMsg', i, text: r.msg});
-  if (r.botDue){
-    chessBusy.add(k);
-    setTimeout(() => {
-      chessBusy.delete(k);
-      const w2 = worlds.get(w.name); if (!w2) return;
-      const om2 = new Map(w2.data.meta).get(i); if (w2.data.fg[i] !== 63 || !om2 || !om2.chess) return;
-      const T = Chess.botStep(om2.chess); if (T) applyTile(w2, i, 63, w2.data.bgw[i], {chess: T}, null);
-    }, 450 + Math.floor(Math.random() * 500));
-  }
-}
-function handleVend(c, m){
-  const w = worlds.get(c.world); if (!w || c.frozen) return;
-  const i = m.i; if (!Number.isInteger(i) || i < 0 || i >= N) return;
-  const d = w.data, om = new Map(d.meta).get(i);
-  if (d.fg[i] !== 62 || !om || !om.vend) return;
-  const tx = i % COLS, ty = (i / COLS) | 0;
-  if (!inReachS(c, tx, ty)) return deny(c, w, i, 'Terlalu jauh dari Vending Machine.');
-  if (social.inTrade(c.user)) return deny(c, w, i, 'Selesaikan trade dulu.');
-  const u = c.user, E = econOf(u), V = {...om.vend}, mine = V.owner === u;
-  const nm = k => D.itemDef(k).name, fmt = n => n.toLocaleString('id-ID');
-  const done = (msg, push = true) => { applyTile(w, i, 62, d.bgw[i], {vend: V}, null); saveEcon(u); if (push) pushEcon(c, msg ? [['act', msg]] : []); };
-  const n = m.n === undefined ? 1 : m.n;
-  if (m.op === 'buy'){
-    if (mine) return deny(c, w, i, 'Ini mesinmu sendiri.');
-    if (!V.key || V.n < 1) return deny(c, w, i, 'Stok habis.');
-    if (V.price < 1) return deny(c, w, i, 'Pemilik belum memasang harga.');
-    if (m.key !== V.key || m.price !== V.price) return deny(c, w, i, 'Harga atau barang baru saja diganti pemilik. Cek lagi.');
-    if (!Number.isInteger(n) || n < 1 || n > V.n) return deny(c, w, i, 'Jumlah tidak valid (stok ' + V.n + ').');
-    const total = V.price * n;
-    if (E.gems < total) return deny(c, w, i, 'Gems tidak cukup (butuh ' + fmt(total) + ').');
-    const err = econ.fits(E, [[V.key, n]]); if (err) return deny(c, w, i, err);
-    econ.run(E, g => { g.addGems(-total); g.addItem(V.key, n); });
-    V.n -= n; V.earned += total; const key = V.key;   // barang tetap tercatat saat habis, supaya pemilik tahu apa yang perlu diisi
-    done('Kamu membeli ' + n + ' ' + nm(key) + ' seharga ' + fmt(total) + ' gems.');
-    const oc = findOnline(V.owner);
-    if (oc) oc.send({t: 'note', text: social.display(u) + ' membeli ' + n + ' ' + nm(key) + ' dari Vending Machine-mu (' + fmt(total) + ' gems).'});
-    return;
-  }
-  if (!mine) return deny(c, w, i, 'Hanya pemilik (' + V.owner + ') yang bisa mengatur Vending Machine ini.');
-  if (m.op === 'stock'){
-    const key = String(m.key || '');
-    if (!econ.isKey(key) || key === D.FIST || key === D.WRENCH) return deny(c, w, i, 'Item ini tidak bisa dijual.');
-    if (V.key && V.n > 0 && V.key !== key) return deny(c, w, i, 'Mesin masih berisi ' + nm(V.key) + '. Ambil stoknya dulu untuk ganti barang.');
-    if (!Number.isInteger(n) || n < 1) return deny(c, w, i, 'Jumlah tidak valid.');
-    const have = (E.bag.find(s => s.key === key) || {n: 0}).n;
-    if (have < n) return deny(c, w, i, 'Kamu hanya punya ' + have + ' ' + nm(key) + '.');
-    if (V.n + n > D.STACK) return deny(c, w, i, 'Stok maksimal ' + D.STACK + ' (sekarang ' + V.n + ').');
-    econ.run(E, g => g.takeItem(key, n));
-    V.key = key; V.n += n;
-    return done(n + ' ' + nm(key) + ' dimasukkan ke Vending Machine (stok ' + V.n + ').');
-  }
-  if (m.op === 'take'){
-    if (!V.key || V.n < 1) return deny(c, w, i, 'Stok kosong.');
-    const k = Number.isInteger(m.n) && m.n > 0 ? Math.min(m.n, V.n) : V.n;   // tanpa jumlah = ambil semua
-    const err = econ.fits(E, [[V.key, k]]); if (err) return deny(c, w, i, err);
-    econ.run(E, g => g.addItem(V.key, k)); V.n -= k; const key = V.key; if (!V.n) V.key = null;
-    return done(k + ' ' + nm(key) + ' diambil dari Vending Machine.');
-  }
-  if (m.op === 'price'){
-    const p = m.price; if (!Number.isInteger(p) || p < 1 || p > VEND_PRICE_MAX) return deny(c, w, i, 'Harga 1–' + fmt(VEND_PRICE_MAX) + ' gems per item.');
-    V.price = p; return done('Harga diatur: ' + fmt(p) + ' gems per item.');
-  }
-  if (m.op === 'collect'){
-    if (!V.earned) return deny(c, w, i, 'Belum ada hasil penjualan.');
-    const g0 = V.earned; econ.run(E, g => g.addGems(g0)); V.earned = 0;
-    return done(fmt(g0) + ' gems hasil penjualan diambil.');
-  }
-}
-function insideSolidAt(st, tx, ty){ return st.x < (tx + 1) * TS && st.x + 26 > tx * TS && st.y < (ty + 1) * TS && st.y + 30 > ty * TS; }
-// klaim tile lock area (sama dengan claimTiles() di world.js, dihitung server)
-function claimTilesS(d, meta, li, type, ignoreAir){
-  const cap = LOCK_TILES[type], rad = LOCK_RADIUS[type] || 10;
-  const lx = li % COLS, ly = (li / COLS) | 0, taken = new Set();
-  for (const [i, o] of meta) if (o && o.lock && o.lock.tiles && i !== li) for (const t of o.lock.tiles) taken.add(t);
-  const out = [], seen = new Set([li]), h = [[0, lx, ly]];
-  const has = i => d.fg[i] !== 0 || d.bgw[i] !== 0;
-  while (h.length && out.length < cap){
-    h.sort((a, b) => a[0] - b[0]);
-    const [, x, y] = h.shift();
-    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
-      const nx = x + dx, ny = y + dy, ni = ny * COLS + nx;
-      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || seen.has(ni) || taken.has(ni)) continue;
-      if (Math.abs(nx - lx) > rad || Math.abs(ny - ly) > rad) continue;
-      seen.add(ni);
-      const dist = (nx - lx) ** 2 + (ny - ly) ** 2;
-      if (ignoreAir && !has(ni)){ h.push([dist, nx, ny]); continue; }
-      if (d.fg[ni] === 7) continue;
-      out.push(ni); h.push([dist, nx, ny]);
-      if (out.length >= cap) break;
-    }
-  }
-  return out;
-}
+// ---------- modul aksi (dibuat dengan konteks bersama; social/news diisi setelah dibuat di bawah) ----------
+const ctx = {...store, clients, inWorld, broadcast, findOnline, visibleTo, kickClient};
+Object.assign(ctx, require('./tiles')(ctx));
+Object.assign(ctx, require('./machines')(ctx));
+Object.assign(ctx, require('./chatcmd')(ctx));
+Object.assign(ctx, require('./auth')(ctx));
+const {spawnDropS, checkMove, handleAct, handleChess, handleVend, emoteCmd, broadcastCmd, privateMsg, handleAuth} = ctx;
 
 // ---------- modul sosial ----------
 const social = createSocial({
@@ -756,12 +74,20 @@ const social = createSocial({
   roleChanged(name){ const c = findOnline(name); if (!c) return; c.send({t: 'role', role: social.roleOf(name), display: social.display(name)});
     if (social.rankOf(name) < RANK.mod){ c.noclip = c.fullzoom = c.invis = false; c.send({t: 'staffFx', noclip: false, zoom: false, invis: false}); }
     if (c.world) broadcast(c.world, {t: 'prole', id: c.id, role: social.roleOf(name), display: social.display(name)}, c); },
-  teleport(c, world, st){ const w = worlds.get(world) || loadWorld(world); if (!w) return; if (c.world !== world) enterWorld(c, w); c.lastPos = null; c.send({t: 'tp', x: st ? st.x : null, y: st ? st.y : null}); },
+  teleport(c, world, st){
+    const w = worlds.get(world) || loadWorld(world); if (!w) return;
+    if (c.world !== world) enterWorld(c, w);
+    c.lastPos = null; c.send({t: 'tp', x: st ? st.x : null, y: st ? st.y : null});
+  },
   shutdown: () => shutdown()
 });
 // v1.6: Kabar TileGrow (file server/news.txt di folder data; diedit dengan Notepad atau dari game oleh Developer)
-const news = createNews({file: path.join(DATA, 'news.txt'), onChange: () => { const n = news.get(); for (const o of clients) if (o.user) o.send({t: 'news', ...n, canEdit: social.rankOf(o.user) >= RANK.dev}); }});
+const news = createNews({file: path.join(DATA, 'news.txt'), onChange: () => {
+  const n = news.get();
+  for (const o of clients) if (o.user) o.send({t: 'news', ...n, canEdit: social.rankOf(o.user) >= RANK.dev});
+}});
 const admin = require('./admin.js').createAdmin({social, port: PORT});
+ctx.social = social; ctx.news = news;
 
 // ---------- pesan ----------
 function handle(c, m){
@@ -949,10 +275,10 @@ const server = http.createServer((req, res) => {
 server.on('upgrade', (req, sock) => {
   if ((req.url || '').split('?')[0] !== '/ws' || String(req.headers.upgrade).toLowerCase() !== 'websocket') return sock.destroy();
   const key = req.headers['sec-websocket-key']; if (!key) return sock.destroy();
-  const accept = crypto.createHash('sha1').update(key + GUID).digest('base64');
+  const accept = acceptKey(key);
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   sock.setNoDelay(true);
-  clients.add(new Client(sock, clientIp(req, sock)));
+  clients.add(new Client(sock, clientIp(req, sock), {onMessage: handle, onClose: c => { leaveWorld(c); clients.delete(c); }}));
 });
 // ping tiap 20 dtk supaya koneksi mati terdeteksi
 setInterval(()=>{ for (const c of clients) try { c.sock.write(wsControl(9)); } catch(e){} }, 20000);

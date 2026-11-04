@@ -81,7 +81,11 @@ function loadEcon(root){
     return run(E, g => {
       const price = it.price === 'bag' ? g.bagUpgradeCost() : it.price;
       if (E.gems < price) return 'Gems tidak cukup.';
-      if (it.key === 'bag8'){ if (E.bagSlots >= 64) return 'Tas sudah maksimal.'; g.addGems(-price); vm.runInContext('bagSlots += 8', ctx); out.push(['act', 'Tas sekarang ' + (E.bagSlots + 8) + ' slot.']); return null; }
+      if (it.key === 'bag8'){
+        if (E.bagSlots >= 64) return 'Tas sudah maksimal.';
+        g.addGems(-price); vm.runInContext('bagSlots += 8', ctx);
+        out.push(['act', 'Tas sekarang ' + (E.bagSlots + 8) + ' slot.']); return null;
+      }
       const err = fits(E, it.give); if (err) return err;
       g.addGems(-price);
       g.questEvent('buy', null, 1);
