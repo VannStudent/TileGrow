@@ -23,12 +23,22 @@ function createAdmin({social, port}){
     if (p === '/admin' && req.method === 'GET'){ send(res, 200, 'text/html; charset=utf-8', page(TOKEN)); return true; }
     if (req.headers['x-tilegrow-admin'] !== TOKEN){ json(res, 403, {err: 'Token salah. Muat ulang halaman admin.'}); return true; }
     if (p === '/admin/api/accounts' && req.method === 'GET'){ json(res, 200, {accounts: social.listAccounts()}); return true; }
-    if (p === '/admin/api/role' && req.method === 'POST'){
+    // aksi POST: role (ubah role), rename (ganti nama), delete (hapus akun)
+    const POST = {
+      role: m => social.setRole(String(m.name || ''), String(m.role || ''), 'ADMIN-PANEL'),
+      rename: m => social.renameAccount(String(m.name || ''), String(m.to || ''), 'ADMIN-PANEL'),
+      // hapus tidak bisa dibatalkan: panel wajib mengirim ulang nama yang sama sebagai konfirmasi
+      delete: m => String(m.name || '') !== String(m.confirm || '')
+        ? {ok: false, err: 'Konfirmasi nama tidak cocok.'}
+        : social.deleteAccount(String(m.name || ''), 'ADMIN-PANEL')
+    };
+    const act = p.startsWith('/admin/api/') ? p.slice(11) : '';
+    if (POST[act] && req.method === 'POST'){
       let body = '';
       req.on('data', d => { body += d; if (body.length > 2000) req.destroy(); });
       req.on('end', () => {
         let m; try { m = JSON.parse(body); } catch(e){ return json(res, 400, {err: 'Data rusak.'}); }
-        const r = social.setRole(String(m.name || ''), String(m.role || ''), 'ADMIN-PANEL');
+        let r; try { r = POST[act](m); } catch(e){ console.error('[admin]', e); r = {ok: false, err: 'Server error: ' + e.message}; }
         if (r.ok) console.log('[admin] ' + r.text);
         json(res, r.ok ? 200 : 400, r);
       });
@@ -41,7 +51,7 @@ function createAdmin({social, port}){
 
 function page(token){
   return `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TileGrow · Panel Role</title>
+<title>TileGrow · Panel Role & Pemain</title>
 <style>
   body{margin:0;font-family:system-ui,sans-serif;background:#141c2c;color:#e8f0ff}
   .wrap{max-width:720px;margin:0 auto;padding:20px}
@@ -49,6 +59,8 @@ function page(token){
   .bar{display:flex;gap:8px;margin-bottom:10px}
   input,select,button{font:inherit;border-radius:8px;border:2px solid #2c4a6e;background:#0e1626;color:#e8f0ff;padding:7px 10px}
   input{flex:1} button{cursor:pointer;background:#2f6fd6;border-color:#1d3f7a;font-weight:700} button:hover{filter:brightness(1.1)}
+  button.warn{background:#c88318;border-color:#8a5a0e} button.danger{background:#c4382c;border-color:#8a2118}
+  td button{margin-bottom:2px}
   table{width:100%;border-collapse:collapse;background:#0e1626;border-radius:10px;overflow:hidden}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #22324c;font-size:14px} th{background:#1a2740;color:#9fb3d1;font-weight:700}
   .dev{color:#ff9a2e;font-weight:800} .mod{color:#c07cff;font-weight:800} .player{color:#e8f0ff}
@@ -56,12 +68,14 @@ function page(token){
   #msg{min-height:20px;margin:8px 0;font-size:14px} .ok{color:#7be37a} .err{color:#ff8080}
   .note{color:#9fb3d1;font-size:12px;margin-top:14px;line-height:1.5}
 </style></head><body><div class="wrap">
-<h1>Panel Role TileGrow</h1>
+<h1>Panel Role & Pemain TileGrow</h1>
 <p class="sub">Hanya bisa dibuka dari PC server ini. Developer = nama <span class="dev">@oranye</span>, Moderator = nama <span class="mod">@ungu</span>.</p>
 <div class="bar"><input id="q" placeholder="Cari nama pemain..." autocomplete="off"><button id="reload" type="button">Muat ulang</button></div>
 <div id="msg"></div>
-<table><thead><tr><th>Pemain</th><th>Status</th><th>Role</th><th></th></tr></thead><tbody id="list"><tr><td colspan="4">Memuat...</td></tr></tbody></table>
-<p class="note">Perubahan langsung berlaku: pemain yang sedang online melihat namanya berubah tanpa login ulang. Semua perubahan dicatat di server/data/staff-log.jsonl sebagai ADMIN-PANEL.<br>
+<table><thead><tr><th>Pemain</th><th>Status</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="list"><tr><td colspan="4">Memuat...</td></tr></tbody></table>
+<p class="note">Perubahan role langsung berlaku: pemain yang sedang online melihat namanya berubah tanpa login ulang. Semua perubahan dicatat di server/data/staff-log.jsonl sebagai ADMIN-PANEL.<br>
+<b>Ganti nama</b>: semua milik pemain ikut pindah (lock, World Lock, akses, Vending Machine, teman, kursi catur). Pemain itu logout dan login lagi dengan nama baru.<br>
+<b>Hapus</b>: tidak bisa dibatalkan. Lock & Vending Machine miliknya dihapus dari semua world. Cadangan accounts.json disimpan otomatis di folder data (accounts.*.bak.json).<br>
 Developer bisa ban permanen, IP ban, dan mengangkat Moderator. Berikan hanya ke orang yang benar-benar kamu percaya.</p>
 </div>
 <script>
@@ -79,8 +93,24 @@ function render(){
   $('list').innerHTML = rows.length ? rows.map(a => '<tr><td class="' + a.role + '">' + (a.role === 'player' ? '' : '@') + esc(a.name) + '</td>' +
     '<td><span class="dot' + (a.online ? ' on' : '') + '"></span>' + (a.online ? 'Online' : 'Offline') + '</td>' +
     '<td><select data-n="' + esc(a.name) + '">' + ['player','mod','dev'].map(r => '<option value="' + r + '"' + (r === a.role ? ' selected' : '') + '>' + NAMES[r] + '</option>').join('') + '</select></td>' +
-    '<td><button type="button" data-save="' + esc(a.name) + '">Simpan</button></td></tr>').join('')
+    '<td><button type="button" data-save="' + esc(a.name) + '">Simpan</button>' +
+    ' <button type="button" class="warn" data-ren="' + esc(a.name) + '">Ganti nama</button>' +
+    ' <button type="button" class="danger" data-del="' + esc(a.name) + '">Hapus</button></td></tr>').join('')
     : '<tr><td colspan="4">' + (all.length ? 'Tidak ada yang cocok.' : 'Belum ada akun. Pemain harus daftar dulu di game.') + '</td></tr>';
+  document.querySelectorAll('[data-ren]').forEach(b => b.onclick = async () => {
+    const name = b.dataset.ren;
+    const to = prompt('Ganti nama ' + name + ' menjadi? (3-16 huruf/angka)\n\nLock, World Lock, akses, Vending Machine, teman, dan kursi catur ikut diganti.\nPemain ini akan logout dan harus login dengan nama baru.', name);
+    if (to === null) return;
+    try { const r = await api('rename', {name, to: to.trim()}); msg(r.text, true); load(); } catch(e){ msg(e.message, false); }
+  });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    const name = b.dataset.del;
+    if (!confirm('HAPUS akun ' + name + '?\n\nTas, gems, XP, dan teman hilang. Lock & Vending Machine miliknya dihapus dari semua world (area jadi bebas).\nTidak bisa dibatalkan.')) return;
+    const c = prompt('Ketik ulang nama akun untuk konfirmasi:', '');
+    if (c === null) return;
+    if (c.trim() !== name) return msg('Konfirmasi tidak cocok. Akun tidak dihapus.', false);
+    try { const r = await api('delete', {name, confirm: c.trim()}); msg(r.text, true); load(); } catch(e){ msg(e.message, false); }
+  });
   document.querySelectorAll('[data-save]').forEach(b => b.onclick = async () => {
     const name = b.dataset.save, role = document.querySelector('select[data-n="' + CSS.escape(name) + '"]').value, cur = all.find(a => a.name === name).role;
     if (role === cur) return msg(name + ' sudah ' + NAMES[role] + '.', true);

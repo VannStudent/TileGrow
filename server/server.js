@@ -61,7 +61,7 @@ function refreshVisibility(c){
 function kickClient(o, reason){ o.send({t: 'kicked', reason}); leaveWorld(o); o.user = null; setTimeout(() => o.close(), 50); }
 
 // ---------- modul aksi (dibuat dengan konteks bersama; social/news diisi setelah dibuat di bawah) ----------
-const ctx = {...store, clients, inWorld, broadcast, findOnline, visibleTo, kickClient};
+const ctx = {...store, clients, inWorld, broadcast, findOnline, visibleTo, kickClient, isLocalIp};
 Object.assign(ctx, require('./tiles')(ctx));
 Object.assign(ctx, require('./machines')(ctx));
 Object.assign(ctx, require('./chatcmd')(ctx));
@@ -71,6 +71,7 @@ const {spawnDropS, checkMove, handleAct, handleChess, handleVend, emoteCmd, broa
 // ---------- modul sosial ----------
 const social = createSocial({
   DATA, accounts, saveAccounts, clients, findOnline, kickClient, econ, econOf, saveEcon, pushEcon, isLocalIp, refreshVisibility,
+  worlds, scheduleWorldSave: store.scheduleWorldSave, playerFile, econs,   // v1.9: ganti nama / hapus akun
   roleChanged(name){ const c = findOnline(name); if (!c) return; c.send({t: 'role', role: social.roleOf(name), display: social.display(name)});
     if (social.rankOf(name) < RANK.mod){ c.noclip = c.fullzoom = c.invis = false; c.send({t: 'staffFx', noclip: false, zoom: false, invis: false}); }
     if (c.world) broadcast(c.world, {t: 'prole', id: c.id, role: social.roleOf(name), display: social.display(name)}, c); },

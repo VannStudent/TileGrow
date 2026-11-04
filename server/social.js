@@ -382,6 +382,162 @@ function createSocial(S){
     a.role = val === 'player' ? undefined : val; S.saveAccounts(); S.roleChanged(a.name); staffLog(by, 'setrole', a.name, {role: val});
     return {ok: true, text: a.name + ' sekarang ' + ROLE_NAME[val] + '.'};
   }
+  // ---------- v1.9: ganti nama & hapus akun (hanya dari Panel Role) ----------
+  // Nama pemain dipakai di banyak tempat: file pemain, role, teman, ban/mute, ignore, lock & World Lock,
+  // akses lock, Vending Machine, dan kursi catur. Semua ikut diganti supaya tidak ada yang kehilangan rumahnya.
+  const NAME_RE = /^[A-Za-z0-9]{3,16}$/;
+  // sapu semua world (termasuk yang sedang tidak dimuat) sambil memegang satu world sekali saja
+  function eachWorld(fn){
+    const dir = path.join(S.DATA, 'worlds');
+    let files = []; try { files = fs.readdirSync(dir).filter(f => f.endsWith('.json')); } catch(e){ files = []; }
+    const names = new Set(files.map(f => f.slice(0, -5)));
+    for (const w of S.worlds.keys()) names.add(w);
+    let hit = 0;
+    for (const name of names){
+      const live = S.worlds.get(name);
+      const data = live ? live.data : read(path.join(dir, name + '.json'), null);
+      if (!data || !Array.isArray(data.meta)) continue;
+      const changed = [];
+      for (const e of data.meta){
+        const m = e && e[1]; if (!m) continue;
+        const r = fn(m, name, e[0]);
+        if (r === 'remove'){ data.fg[e[0]] = 0; e[1] = null; changed.push(e[0]); }   // block milik akun yang dihapus: tile dikosongkan
+        else if (r) changed.push(e[0]);
+      }
+      if (!changed.length) continue;
+      data.meta = data.meta.filter(e => e && e[1]);
+      if (live){
+        // pemain di world itu langsung melihat perubahannya
+        const meta = new Map(data.meta), trees = new Map(data.trees);
+        const ops = changed.map(i => [i, data.fg[i], data.bgw[i], meta.get(i) || null, trees.get(i) || null]);
+        for (const o of S.clients) if (o.world === name) o.send({t: 'ops', from: 0, ops});
+      }
+      hit++;
+      if (live) S.scheduleWorldSave(live); else write(path.join(dir, name + '.json'), data);
+    }
+    return hit;
+  }
+  // ganti nama di satu meta tile. Hasil: true kalau ada yang berubah.
+  function metaRename(m, from, to){
+    let ch = false;
+    if (m.lock){
+      if (m.lock.owner === from){ m.lock.owner = to; ch = true; }
+      if (Array.isArray(m.lock.access)){
+        const a = m.lock.access.map(n => n === from ? to : n);
+        if (a.some((n, i) => n !== m.lock.access[i])){ m.lock.access = a; ch = true; }
+      }
+    }
+    if (m.vend && m.vend.owner === from){ m.vend.owner = to; ch = true; }
+    if (m.chess){
+      if (m.chess.w === from){ m.chess.w = to; ch = true; }
+      if (m.chess.b === from){ m.chess.b = to; ch = true; }
+    }
+    return ch;
+  }
+  // bebaskan milik pemain: block lock & vending miliknya dihapus (area jadi bebas), namanya dicoret dari akses, kursi catur dikosongkan
+  function metaStrip(m, who){
+    let ch = false;
+    if (m.lock){
+      if (m.lock.owner === who) return 'remove';
+      if (Array.isArray(m.lock.access) && m.lock.access.includes(who)){
+        m.lock.access = m.lock.access.filter(n => n !== who); ch = true;
+      }
+    }
+    if (m.vend && m.vend.owner === who) return 'remove';
+    if (m.chess){
+      if (m.chess.w === who){ m.chess.w = null; ch = true; }
+      if (m.chess.b === who){ m.chess.b = null; ch = true; }
+    }
+    return ch;
+  }
+  // backup accounts.json sebelum perubahan yang tidak bisa dibatalkan
+  function backupAccounts(tag){
+    try {
+      const f = path.join(S.DATA, 'accounts.json');
+      if (fs.existsSync(f)) fs.copyFileSync(f, path.join(S.DATA, 'accounts.' + tag + '.' + Date.now() + '.bak.json'));
+    } catch(e){ console.error('[backup] gagal:', e.message); }
+  }
+  function renameAccount(from, to, by){
+    const a = acc(from);
+    if (!a) return {ok: false, err: 'Akun ' + from + ' tidak ditemukan.'};
+    const want = String(to || '').trim();
+    if (!NAME_RE.test(want)) return {ok: false, err: 'Nama baru 3–16 karakter, hanya huruf dan angka.'};
+    const oldName = a.name, lowFrom = oldName.toLowerCase(), lowTo = want.toLowerCase();
+    if (lowFrom === lowTo && oldName === want) return {ok: false, err: 'Nama barunya sama dengan nama sekarang.'};
+    if (lowFrom !== lowTo && S.accounts[lowTo]) return {ok: false, err: 'Nama ' + want + ' sudah dipakai akun lain.'};
+    if (tradeOf.has(oldName)) return {ok: false, err: oldName + ' sedang trade. Tunggu selesai dulu.'};
+    backupAccounts('rename');
+    // pemain yang online dikeluarkan dulu supaya tidak ada sesi dengan nama lama
+    const oc = S.findOnline(oldName);
+    if (oc) S.kickClient(oc, 'Namamu diganti menjadi ' + want + '. Silakan login dengan nama baru.');
+    // 1) akun
+    delete S.accounts[lowFrom];
+    a.name = want; a.renamedFrom = oldName; a.renamedAt = Date.now();
+    S.accounts[lowTo] = a;
+    // 2) nama di akun lain: teman, permintaan teman, ignore
+    for (const o of Object.values(S.accounts)){
+      if (o === a) continue;
+      for (const k of ['friends', 'freq', 'ignore'])
+        if (Array.isArray(o[k])) o[k] = o[k].map(n => n === oldName ? want : n);
+    }
+    // 3) ban/mute yang DIBUAT pemain ini, dan IP ban miliknya
+    for (const o of Object.values(S.accounts)){
+      if (o.ban && o.ban.by === oldName) o.ban.by = want;
+      if (o.mute && o.mute.by === oldName) o.mute.by = want;
+    }
+    let ipn = 0;
+    for (const ip in ipbans){
+      if (ipbans[ip].user === oldName){ ipbans[ip].user = want; ipn++; }
+      if (ipbans[ip].by === oldName) ipbans[ip].by = want;
+    }
+    if (ipn) write(BAN_FILE, ipbans);
+    // 4) laporan
+    let repn = 0;
+    for (const r of reports){
+      if (r.by === oldName){ r.by = want; repn++; }
+      if (r.target === oldName){ r.target = want; repn++; }
+      if (r.closedBy === oldName){ r.closedBy = want; repn++; }
+    }
+    if (repn) write(REP_FILE, reports);
+    // 5) file pemain (tas, gems, XP): dipindah ke nama baru
+    try {
+      const src = S.playerFile(oldName), dst = S.playerFile(want);
+      if (lowFrom !== lowTo && fs.existsSync(src)){
+        if (fs.existsSync(dst)) fs.unlinkSync(dst);
+        fs.renameSync(src, dst);
+      }
+    } catch(e){ console.error('[rename] file pemain:', e.message); }
+    // ekonomi yang sudah dimuat ikut pindah kunci, supaya tas tidak hilang
+    if (lowFrom !== lowTo && S.econs.has(lowFrom)){ S.econs.set(lowTo, S.econs.get(lowFrom)); S.econs.delete(lowFrom); }
+    // 6) world: lock, akses, vending, kursi catur
+    const nw = eachWorld(m => metaRename(m, oldName, want));
+    S.saveAccounts();
+    staffLog(by, 'rename', want, {from: oldName, worlds: nw});
+    return {ok: true, text: oldName + ' diganti menjadi ' + want + ' (ikut diperbarui di ' + nw + ' world).', name: want};
+  }
+  function deleteAccount(name, by){
+    const a = acc(name);
+    if (!a) return {ok: false, err: 'Akun ' + name + ' tidak ditemukan.'};
+    const who = a.name, low = who.toLowerCase();
+    if (tradeOf.has(who)) return {ok: false, err: who + ' sedang trade. Tunggu selesai dulu.'};
+    backupAccounts('delete');
+    const oc = S.findOnline(who);
+    if (oc) S.kickClient(oc, 'Akun ini dihapus oleh pemilik server.');
+    delete S.accounts[low];
+    for (const o of Object.values(S.accounts))
+      for (const k of ['friends', 'freq', 'ignore'])
+        if (Array.isArray(o[k])) o[k] = o[k].filter(n => n !== who);
+    let ipn = 0;
+    for (const ip in ipbans) if (ipbans[ip].user === who){ delete ipbans[ip]; ipn++; }
+    if (ipn) write(BAN_FILE, ipbans);
+    try { const f = S.playerFile(who); if (fs.existsSync(f)) fs.unlinkSync(f); } catch(e){ console.error('[delete] file pemain:', e.message); }
+    S.econs.delete(low);
+    const nw = eachWorld(m => metaStrip(m, who));
+    S.saveAccounts();
+    staffLog(by, 'deleteAccount', who, {worlds: nw});
+    return {ok: true, text: 'Akun ' + who + ' dihapus. Lock & Vending Machine miliknya dibebaskan di ' + nw + ' world.'};
+  }
+
   function listAccounts(){
     return Object.values(S.accounts).map(a => ({name: a.name, role: a.role || 'player', online: !!S.findOnline(a.name), created: a.created || null}))
       .sort((x, y) => (RANK[y.role] - RANK[x.role]) || x.name.localeCompare(y.name));
@@ -413,6 +569,6 @@ function createSocial(S){
 
   return {RANK, ROLE_NAME, roleOf, rankOf, display, muteInfo, loginBlock, friendList, friendReq, friendAccept, friendDecline, friendRemove,
           report, tradeRequest, tradeAccept, tradeDecline, tradeOffer, tradeOk, tradeConfirm, tradeCancel, onLeave, inTrade: u => tradeOf.has(u),
-          command, consoleCmd, setRole, listAccounts, pushFriends, staffLog, REASONS};
+          command, consoleCmd, setRole, listAccounts, renameAccount, deleteAccount, pushFriends, staffLog, REASONS};
 }
 module.exports = {createSocial, RANK};

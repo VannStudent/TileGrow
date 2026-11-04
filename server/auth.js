@@ -2,7 +2,7 @@
 'use strict';
 const crypto = require('crypto');
 const {RANK} = require('./social');
-const {TEST} = require('./config');
+const {TEST, REG_MAX} = require('./config');
 const {readJSON, playerFile, accounts, saveAccounts, econOf} = require('./store');
 
 // ---------- password: scrypt + salt (password asli tidak pernah disimpan) ----------
@@ -14,7 +14,7 @@ module.exports = function createAuth(ctx){
 // ---------- batas percobaan login (anti tebak password) ----------
 // 5 gagal dalam 60 dtk (per IP atau per username) = diblokir 60 dtk. Akun baru maks 35 per IP per jam
 // (banyak pemain bisa berbagi satu IP: satu WiFi, atau kuota HP yang IP-nya dipakai bersama).
-const FAIL_MAX = 5, FAIL_WINDOW = 60000, FAIL_BLOCK = 60000, REG_MAX = 35, REG_WINDOW = 3600000;
+const FAIL_MAX = 5, FAIL_WINDOW = 60000, FAIL_BLOCK = 60000, REG_WINDOW = 3600000;
 const fails = new Map(), regs = new Map();
 function blockedFor(key){ const f = fails.get(key); return f && f.until > Date.now() ? Math.ceil((f.until - Date.now()) / 1000) : 0; }
 function noteFail(key){
@@ -42,7 +42,9 @@ async function handleAuth(c, m, t){
     if (pass.length < 6) return c.send({t: 'auth', ok: false, err: 'Password minimal 6 karakter.'});
     if (accounts[key]) return c.send({t: 'auth', ok: false, err: 'Username sudah dipakai di server ini.'});
     const r = regs.get(c.ip) || {n: 0, t: Date.now()};
-    if (r.n >= REG_MAX && !TEST) return c.send({t: 'auth', ok: false, err: 'Terlalu banyak akun baru dari perangkat ini. Coba lagi nanti.'});
+    // batas akun baru per IP per jam. Dari PC server sendiri tidak dibatasi (buat tes), dan bisa diatur: set REG_MAX=200
+    if (r.n >= REG_MAX && !TEST && !ctx.isLocalIp(c.ip))
+      return c.send({t: 'auth', ok: false, err: 'Terlalu banyak akun baru dari perangkat ini. Coba lagi nanti.'});
     const salt = crypto.randomBytes(16).toString('hex'), hash = await scryptAsync(pass, salt);
     if (accounts[key]) return c.send({t: 'auth', ok: false, err: 'Username sudah dipakai di server ini.'});
     accounts[key] = {name: user, salt, hash, flag: flag || 'ID', created: Date.now()};
@@ -66,8 +68,8 @@ async function handleAuth(c, m, t){
   const E = econOf(a.name);
   c.send({t: 'auth', ok: true, user: a.name, flag: a.flag, role: ctx.social.roleOf(a.name), display: ctx.social.display(a.name),
           player: f.client || null, econ: {bag: E.bag, bagSlots: E.bagSlots, gems: E.gems, prog: E.prog}, isNew: t === 'register'});
-  c.send({t: 'friends', ...social.friendList(a.name)});
-  c.send({t: 'news', ...news.get(), canEdit: ctx.social.rankOf(a.name) >= RANK.dev});
+  c.send({t: 'friends', ...ctx.social.friendList(a.name)});
+  c.send({t: 'news', ...ctx.news.get(), canEdit: ctx.social.rankOf(a.name) >= RANK.dev});
   for (const fr of ctx.social.friendList(a.name).friends){ const fc = findOnline(fr.name); if (fc) ctx.social.pushFriends(fr.name); }
 }
   return {handleAuth};
