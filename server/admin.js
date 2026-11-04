@@ -99,13 +99,13 @@ function render(){
     : '<tr><td colspan="4">' + (all.length ? 'Tidak ada yang cocok.' : 'Belum ada akun. Pemain harus daftar dulu di game.') + '</td></tr>';
   document.querySelectorAll('[data-ren]').forEach(b => b.onclick = async () => {
     const name = b.dataset.ren;
-    const to = prompt('Ganti nama ' + name + ' menjadi? (3-16 huruf/angka)\n\nLock, World Lock, akses, Vending Machine, teman, dan kursi catur ikut diganti.\nPemain ini akan logout dan harus login dengan nama baru.', name);
+    const to = prompt('Ganti nama ' + name + ' menjadi? (3-16 huruf/angka)\\n\\nLock, World Lock, akses, Vending Machine, teman, dan kursi catur ikut diganti.\\nPemain ini akan logout dan harus login dengan nama baru.', name);
     if (to === null) return;
     try { const r = await api('rename', {name, to: to.trim()}); msg(r.text, true); load(); } catch(e){ msg(e.message, false); }
   });
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
     const name = b.dataset.del;
-    if (!confirm('HAPUS akun ' + name + '?\n\nTas, gems, XP, dan teman hilang. Lock & Vending Machine miliknya dihapus dari semua world (area jadi bebas).\nTidak bisa dibatalkan.')) return;
+    if (!confirm('HAPUS akun ' + name + '?\\n\\nTas, gems, XP, dan teman hilang. Lock & Vending Machine miliknya dihapus dari semua world (area jadi bebas).\\nTidak bisa dibatalkan.')) return;
     const c = prompt('Ketik ulang nama akun untuk konfirmasi:', '');
     if (c === null) return;
     if (c.trim() !== name) return msg('Konfirmasi tidak cocok. Akun tidak dihapus.', false);

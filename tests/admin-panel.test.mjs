@@ -10,6 +10,7 @@ await new Promise(r => ws.onopen = r); ws.send(JSON.stringify({t: 'register', us
 
 let r = await fetch(L + '/admin'); const html = await r.text();
 ok('panel terbuka dari localhost', r.status === 200 && html.includes('Panel Role'));
+{ const js = (html.split('<script>')[1] || '').split('</script>')[0]; let e = null; try { new Function(js); } catch(x){ e = x.message; } ok('skrip panel valid (tidak error di browser)', !e, e || ''); }
 const token = (html.match(/const TOKEN = "([0-9a-f]+)"/) || [])[1]; ok('token ada di halaman', !!token);
 r = await fetch(L + '/admin/api/accounts'); ok('API tanpa token ditolak', r.status === 403);
 r = await fetch(L + '/admin/api/accounts', {headers: {'X-TileGrow-Admin': 'salah'}}); ok('API token salah ditolak', r.status === 403);
