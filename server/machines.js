@@ -64,6 +64,7 @@ function handleVend(c, m){
     econ.run(E, g => { payWL(g, pay); g.addItem(V.key, qty); });
     V.n -= qty; V.earned += total; const key = V.key;   // barang tetap tercatat saat habis, supaya pemilik tahu apa yang perlu diisi
     done('Kamu membeli ' + qty + ' ' + nm(key) + ' seharga ' + wlTxt(total) + '.');
+    ctx.econLog('vend', {world: w.name, i, buyer: u, seller: V.owner, key, n: qty, wl: total, per: V.per, price: V.price, stockLeft: V.n});
     const oc = findOnline(V.owner);
     if (oc) oc.send({t: 'note', text: ctx.social.display(u) + ' membeli ' + qty + ' ' + nm(key) + ' dari Vending Machine-mu (' + wlTxt(total) + ').'});
     return;
@@ -104,6 +105,7 @@ function handleVend(c, m){
     const g0 = V.gemsOld || 0, e0 = V.earned;
     econ.run(E, g => { if (cl) g.addItem('b34', cl); if (wl) g.addItem('b30', wl); if (g0) g.addGems(g0); });
     V.earned = 0; V.gemsOld = 0;
+    ctx.econLog('vendCollect', {world: w.name, i, owner: u, wl: e0, cl, wlRest: wl, gemsOld: g0});
     const parts = [];
     if (e0) parts.push(wlTxt(e0) + (cl ? ' (' + cl + ' Crystal Lock' + (wl ? ' + ' + wl + ' World Lock' : '') + ')' : ''));
     if (g0) parts.push(fmt(g0) + ' gems dari penjualan lama');

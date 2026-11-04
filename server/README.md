@@ -12,7 +12,7 @@ Perangkat lain di WiFi yang sama cukup buka alamat itu di browser, lalu pilih **
   - `accounts.json`: hash scrypt + salt (bukan password), role, ban/mute, teman
   - `players/*.json`: tas, gems, XP, quest (dipegang server)
   - `worlds/*.json`
-  - `staff-log.jsonl`, `trade-log.jsonl`, `reports.json`, `ipbans.json`
+  - `staff-log.jsonl`, `trade-log.jsonl`, `econ-log.jsonl` (v1.11: tiap beli di Vending Machine, ambil kas, beli di toko), `reports.json`, `ipbans.json`
 - Windows Firewall akan bertanya saat pertama kali: izinkan untuk **Private network** saja.
 
 ## Yang dipegang server (v1.3)
@@ -80,3 +80,9 @@ Kedua perintah menjalankan server sendiri dengan data kosong di port acak.
 | `machines.js` | Papan Catur, Vending Machine |
 | `chatcmd.js` | emote, /broadcast, pesan pribadi |
 | `social.js`, `econ.js`, `news.js`, `admin.js` | role & staff, ekonomi, berita, panel role |
+
+## Cek sebelum rilis (v1.11)
+`node tests/release-check.mjs` — sintaks semua file, skrip di halaman & panel bisa dibaca browser, versi sama di
+`server/config.js` dan `tilegrow.html` (dan sudah naik kalau kode berubah), server bisa start, file rahasia tidak bisa
+diunduh, panel 404 lewat tunnel, salinan `../TileGrow-Server` sama dengan repo, lalu 4 suite tes. `--fast` = tanpa suite tes.
+Hasil akhir: `SIAP RILIS` (exit 0) atau `BELUM SIAP RILIS` + daftar masalah.

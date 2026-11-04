@@ -73,5 +73,10 @@ function pushEcon(c, extra){
   c.send({t: 'econ', bag: E.bag, bagSlots: E.bagSlots, gems: E.gems, prog: E.prog, msgs: [...econ.out.splice(0), ...(extra || [])]});
 }
 
-module.exports = {readJSON, writeJSON, ACC_FILE, accounts, saveAccounts, playerFile, worldFile, worlds, validWorldName, loadWorld,
+// v1.11: catatan transaksi ekonomi (Vending Machine, toko) -> data/econ-log.jsonl, satu baris JSON per transaksi.
+// Dipakai untuk melacak kalau ada item/World Lock yang tiba-tiba muncul (bug duplikasi) atau harga yang aneh.
+const ECON_LOG = path.join(DATA, 'econ-log.jsonl');
+function econLog(kind, o){ fs.appendFile(ECON_LOG, JSON.stringify({t: Date.now(), kind, ...o}) + '\n', e => { if (e) console.error('[econ-log]', e.message); }); }
+
+module.exports = {econLog, ECON_LOG, readJSON, writeJSON, ACC_FILE, accounts, saveAccounts, playerFile, worldFile, worlds, validWorldName, loadWorld,
   scheduleWorldSave, flushAll, worldOwner, econs, econOf, saveEcon, writePlayer, flushEcons, pushEcon};

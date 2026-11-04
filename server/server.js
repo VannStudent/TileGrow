@@ -170,8 +170,9 @@ function handle(c, m){
     }
     case 'buy': {
       if (social.inTrade(c.user)) return c.send({t: 'note', text: 'Selesaikan trade dulu.'});
-      const E = econOf(c.user), err = econ.buy(E, String(m.key || ''));
+      const E = econOf(c.user), g0 = E.gems, key = String(m.key || ''), err = econ.buy(E, key);
       if (err){ econ.out.length = 0; return c.send({t: 'note', text: err}); }
+      store.econLog('shop', {user: c.user, key, gems: g0 - E.gems});
       saveEcon(c.user); return pushEcon(c);
     }
     case 'newsGet': return c.send({t: 'news', ...news.get(), canEdit: social.rankOf(c.user) >= RANK.dev, open: true});

@@ -10,7 +10,7 @@ const srv = spawn(process.execPath, [path.join(root, 'server/server.js')], {env:
 let log = ''; srv.stdout.on('data', d => log += d); srv.stderr.on('data', d => log += d);
 await new Promise(r => setTimeout(r, 900));
 globalThis.__serverStdin = srv.stdin;
-process.env.TPORT = String(PORT);
+process.env.TPORT = String(PORT); process.env.TDATA = data;
 const origExit = process.exit;
 process.exit = code => {
   srv.kill();

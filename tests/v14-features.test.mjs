@@ -170,6 +170,14 @@ drain(p1); vend(p1, {op: 'collect'}); vs = await vstate(p1); e = await lastEcon(
 ok('Pemilik ambil kas 125 WL = 1 Crystal Lock + 25 World Lock', vs && vs.earned === 0 && cnt(e, 'b34') >= 1 && e.msgs.some(x => /125 World Lock \(1 Crystal Lock \+ 25 World Lock\)/.test(x[1])), JSON.stringify(e.msgs));
 drain(p1); vend(p1, {op: 'take'}); vs = await vstate(p1); e = await lastEcon(p1);
 ok('Pemilik ambil sisa stok 1', vs && vs.n === 0 && vs.key === null && cnt(e, 'b9') === 11, JSON.stringify(vs) + ' b9=' + cnt(e, 'b9'));
+// v1.11: catatan transaksi ekonomi
+{ await sleep(300); const fs = await import('node:fs'), pth = await import('node:path');
+  let lines = []; try { lines = fs.readFileSync(pth.join(process.env.TDATA, 'econ-log.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l)); } catch(e){}
+  const v = lines.filter(x => x.kind === 'vend');
+  ok('econ-log: setiap pembelian vending tercatat (pembeli, penjual, item, WL)', v.length === 3 && v.every(x => x.buyer === 'devi' && x.seller === 'pemain' && x.key === 'b9') && v.map(x => x.wl).join(',') === '120,4,1', JSON.stringify(v.map(x => [x.n, x.wl])));
+  ok('econ-log: ambil kas tercatat', lines.some(x => x.kind === 'vendCollect' && x.owner === 'pemain' && x.wl === 125 && x.cl === 1 && x.wlRest === 25));
+  ok('econ-log: pembelian toko tercatat', lines.some(x => x.kind === 'shop' && x.gems > 0));
+  ok('econ-log: pembelian yang ditolak TIDAK tercatat', v.length === 3); }
 drain(p1); vend(p1, {op: 'stock', key: 'w_devil', n: 5}); vs = await vstate(p1);
 ok('Isi stok melebihi yang dimiliki ditolak', vs && vs.denied);
 drain(p1); for (let k = 0; k < 7; k++){ S(p1, {t: 'act', a: 'hit', i: VI}); await sleep(140); }
