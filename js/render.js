@@ -346,6 +346,26 @@ function drawPlayer(rx, ry){
 }
 
 // balon chat di atas kepala (seperti Growtopia), hilang setelah beberapa detik
+// v1.15: bingkai item yang ter-drop (gaya kotak kaca). Warna garis = warna rarity item (RARITY di data.js).
+// Gems tidak diberi bingkai. Ukuran 22x22 px dunia, item di tengah.
+const DROP_HALF = 11;
+function drawDropFrame(g, x, y, key){
+  const col = (RARITY[rarityOf(key)] || RARITY.common).color, H = DROP_HALF;
+  x = Math.round(x); y = Math.round(y);
+  g.fillStyle = OL; g.fillRect(x - H - 1, y - H - 1, H*2 + 2, H*2 + 2);          // garis luar gelap
+  g.fillStyle = col; g.fillRect(x - H, y - H, H*2, H*2);                          // bingkai warna rarity
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(x - H + 2, y - H + 2, H*2 - 4, 1);  // tepi dalam lebih gelap (bevel)
+  g.fillRect(x - H + 2, y - H + 2, 1, H*2 - 4);
+  g.fillStyle = 'rgba(120,140,160,.42)'; g.fillRect(x - H + 2, y - H + 2, H*2 - 4, H*2 - 4);   // isi kaca tembus pandang (cukup terang supaya item gelap tetap terlihat)
+}
+// kilau kaca: 3 garis miring tipis di atas item (dari kiri-bawah ke kanan-atas)
+function drawDropSheen(g, x, y){
+  const H = DROP_HALF - 2; x = Math.round(x); y = Math.round(y);
+  g.save(); g.beginPath(); g.rect(x - H, y - H, H*2, H*2); g.clip();
+  g.strokeStyle = 'rgba(255,255,255,.38)'; g.lineWidth = 1.5;
+  for (const o of [-6, 1, 8]){ g.beginPath(); g.moveTo(x - H + o - 6, y + H); g.lineTo(x + H + o - 6 - 8, y - H); g.stroke(); }
+  g.restore();
+}
 let BUBBLE_TOP = null;
 function drawBubble(cx, topY){
   BUBBLE_TOP = null;
@@ -584,11 +604,13 @@ function draw(alpha){
         ctx.strokeText(it.n, it.x, fy + 17); ctx.fillText(it.n, it.x, fy + 17); ctx.textAlign = 'left'; }
       continue; }
     const d = itemDef(it.key);
+    drawDropFrame(ctx, it.x, fy, it.key);                   // v1.15: bingkai kaca, warna = rarity item
     if (d.kind === 'seed') drawSeed(ctx, it.x, fy, 1, BY_ID[d.id].color);
     else if (d.kind === 'wrench') drawWrench(ctx, it.x, fy, .8);
-    else { ctx.fillStyle = OL; ctx.fillRect(it.x-8, fy-8, 16, 16); ctx.drawImage(TEX[d.id], it.x-6, fy-6, 12, 12); }
-    if (it.n > 1){ ctx.font = 'bold 9px system-ui'; ctx.fillStyle = '#fff'; ctx.strokeStyle = OL; ctx.lineWidth = 3;
-      ctx.strokeText(it.n, it.x+4, fy+11); ctx.fillText(it.n, it.x+4, fy+11); }
+    else { ctx.fillStyle = OL; ctx.fillRect(it.x-7, fy-7, 14, 14); ctx.drawImage(TEX[d.id], it.x-6, fy-6, 12, 12); }
+    drawDropSheen(ctx, it.x, fy);
+    if (it.n > 1){ ctx.font = 'bold 9px system-ui'; ctx.fillStyle = '#fff'; ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.textAlign = 'right';
+      ctx.strokeText(it.n, it.x+11, fy+11); ctx.fillText(it.n, it.x+11, fy+11); ctx.textAlign = 'left'; }
   }
   for (const p of parts){
     if (p.feather){ ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = Math.min(1, p.life*2);

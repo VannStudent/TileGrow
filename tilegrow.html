@@ -769,6 +769,7 @@
         <button class="btn" id="mControls">Kontrol: <b id="ctlNow">Keyboard &amp; Mouse</b></button>
         <button class="btn" id="mGuest">Main sebagai Tamu (tes lock)</button>
         <button class="btn warn" id="mNew">Hapus semua &amp; mulai baru</button>
+        <button class="btn" id="mPass">🔑 Ganti password</button>
         <button class="btn" id="mLogout">Logout</button>
       </div>
       <label style="margin-top:14px">Pengaturan</label>
@@ -808,6 +809,16 @@
     <p class="iiDesc" id="iiDesc"></p>
     <div class="iiFacts" id="iiFacts"></div>
     <div class="info" id="iiActs" style="justify-content:flex-end;flex-wrap:wrap"></div>
+  </div></div>
+
+  <!-- v1.15: ganti password (wajib isi password lama) -->
+  <div class="modal hidden" id="passM"><div class="win card" style="width:min(380px,94vw)">
+    <h2>🔑 Ganti password <button class="btn x">Tutup</button></h2>
+    <label>Password lama</label><input id="pwOld" type="password" maxlength="64" autocomplete="current-password">
+    <label>Password baru (min. 6 karakter)</label><input id="pwNew" type="password" maxlength="64" autocomplete="new-password">
+    <label>Ulangi password baru</label><input id="pwNew2" type="password" maxlength="64" autocomplete="new-password">
+    <div class="err" id="pwErr"></div>
+    <div class="info" style="justify-content:flex-end"><button class="btn x">Batal</button><button class="btn primary" id="pwOk">Simpan</button></div>
   </div></div>
 
   <div class="modal hidden" id="exitM"><div class="win card" style="width:min(360px,94vw)">
@@ -904,7 +915,7 @@
       <button class="tBtn" id="tOptions">Opsi</button>
       <button class="tBtn" id="tAbout">Tentang</button>
     </div>
-    <div class="tVer">v1.14</div>
+    <div class="tVer">v1.15</div>
     <button class="tMusic" id="tMusic" title="Musik">♪</button>
   </div>
 

@@ -67,7 +67,7 @@ Object.assign(ctx, require('./machines')(ctx));
 Object.assign(ctx, require('./chatcmd')(ctx));
 Object.assign(ctx, require('./auth')(ctx));
 Object.assign(ctx, require('./worldmod')(ctx));                  // v1.13: owner/admin world: pull, kick, ban
-const {spawnDropS, checkMove, handleAct, handleChess, handleVend, emoteCmd, broadcastCmd, privateMsg, handleAuth} = ctx;
+const {spawnDropS, checkMove, handleAct, handleChess, handleVend, emoteCmd, broadcastCmd, privateMsg, handleAuth, handleChangePass} = ctx;
 
 // ---------- modul sosial ----------
 const social = createSocial({
@@ -101,6 +101,11 @@ function handle(c, m){
     return handleAuth(c, m, t).catch(e => { console.error('auth error', e); c.send({t: 'auth', ok: false, err: 'Server error.'}); }).finally(() => { c.authBusy = false; });
   }
   if (!c.user) return c.send({t: 'err', text: 'Belum login.'});
+  if (t === 'chpass'){                                // v1.15: ganti password (wajib password lama)
+    if (c.authBusy) return;
+    c.authBusy = true;
+    return handleChangePass(c, m).catch(e => { console.error('chpass error', e); c.send({t: 'chpass', ok: false, err: 'Server error.'}); }).finally(() => { c.authBusy = false; });
+  }
 
   switch (t){
     case 'worlds': return c.send({t: 'worlds', list: listWorlds()});

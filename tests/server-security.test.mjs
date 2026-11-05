@@ -97,6 +97,18 @@ S(a, {t: 'chat', text: '/testgive b30 1'}); await sleep(100);
 drain(a); S(a, {t: 'act', a: 'place', i: at(49, 29), key: 'b30'}); o = await tileAfter(a, at(49, 29), 500);
 ok('A pasang WL di world yang ada lock B ditolak', !o || o[1] === 0);
 drain(a); S(a, {t: 'join', name: 'BARU'}); const nw = await wait(a, 'world'); ok('world baru tanpa data klien dibuat server', nw && nw.data.fg.includes(23));
+// 13b. v1.15 ganti password: wajib password lama yang benar
+drain(a); S(a, {t: 'chpass', old: 'salahbanget', pass: 'barubaru1'}); let cp = await wait(a, 'chpass');
+ok('ganti password: password lama salah ditolak', cp && !cp.ok && /lama salah/.test(cp.err), JSON.stringify(cp));
+S(a, {t: 'chpass', old: '', pass: 'barubaru1'}); cp = await wait(a, 'chpass'); ok('ganti password: tanpa password lama ditolak', cp && !cp.ok);
+S(a, {t: 'chpass', old: 'secret12', pass: 'abc'}); cp = await wait(a, 'chpass'); ok('ganti password: password baru < 6 ditolak', cp && !cp.ok);
+S(a, {t: 'chpass', old: 'secret12', pass: 'barubaru1'}); cp = await wait(a, 'chpass'); ok('ganti password: password lama benar -> berhasil', cp && cp.ok, JSON.stringify(cp));
+const g1 = await open(); S(g1, {t: 'login', user: 'alice1', pass: 'secret12'}); let la = await wait(g1, 'auth');
+ok('setelah ganti: password lama tidak bisa login', la && !la.ok);
+S(g1, {t: 'login', user: 'alice1', pass: 'barubaru1'}); la = await wait(g1, 'auth'); ok('setelah ganti: password baru bisa login', la && la.ok);
+const g2 = await open(); S(g2, {t: 'chpass', old: 'barubaru1', pass: 'curian123'}); cp = await wait(g2, 'chpass', 800);
+ok('ganti password tanpa login ditolak', !cp || !cp.ok);
+S(g1, {t: 'chpass', old: 'barubaru1', pass: 'secret12'}); cp = await wait(g1, 'chpass'); ok('password dikembalikan', cp && cp.ok);
 // 14. brute force
 const d = await open(); let blocked = false;
 for (let i = 0; i < 7; i++){ S(d, {t: 'login', user: 'alice1', pass: 'wrong' + i}); const x = await wait(d, 'auth'); if (x && /Terlalu banyak/.test(x.err)) blocked = true; }

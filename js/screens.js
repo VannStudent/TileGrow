@@ -79,6 +79,28 @@ async function login(user, pass){
   playerFlag = FLAG_DEF[a.flag] ? a.flag : FLAGS[0];
   return null;
 }
+// v1.15: ganti password (wajib password lama). Online: dicek server. Offline: akun lokal di browser ini.
+async function changePassword(old, pass, pass2){
+  if (!old) return 'Isi password lama.';
+  if ((pass || '').length < 6) return 'Password baru minimal 6 karakter.';
+  if (pass !== pass2) return 'Konfirmasi password baru tidak sama.';
+  if (old === pass) return 'Password baru sama dengan password lama.';
+  if (online()){
+    netSend({t: 'chpass', old, pass});
+    let r; try { r = await netWait('chpass'); } catch(e){ return e.message; }
+    return r.ok ? null : (r.err || 'Gagal mengganti password.');
+  }
+  const acc = accounts(), a = account && acc[account];
+  if (!a) return 'Login dulu untuk mengganti password.';
+  if (await sha256(a.salt + ':' + old) !== a.hash) return 'Password lama salah.';
+  a.salt = randSalt(); a.hash = await sha256(a.salt + ':' + pass);
+  saveAccounts(acc);
+  return null;
+}
+function openPassModal(){
+  ['pwOld', 'pwNew', 'pwNew2'].forEach(id => $(id).value = ''); $('pwErr').textContent = '';
+  openModal('passM'); setTimeout(() => $('pwOld').focus(), 50);
+}
 function logout(){
   if (inGame) save();
   if (online()){ netSend({t: 'logout'}); netDisconnect(); }

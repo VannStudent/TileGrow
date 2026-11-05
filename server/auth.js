@@ -72,5 +72,29 @@ async function handleAuth(c, m, t){
   c.send({t: 'news', ...ctx.news.get(), canEdit: ctx.social.rankOf(a.name) >= RANK.dev});
   for (const fr of ctx.social.friendList(a.name).friends){ const fc = findOnline(fr.name); if (fc) ctx.social.pushFriends(fr.name); }
 }
-  return {handleAuth};
+// v1.15: ganti password. Wajib password lama yang benar; percobaan salah ikut dibatasi (5x/60 dtk per akun & IP).
+// m = {t:'chpass', old, pass}. Balasan {t:'chpass', ok, err?}
+async function handleChangePass(c, m){
+  const key = String(c.user || '').toLowerCase(), a = accounts[key];
+  const reply = (ok, err) => c.send({t: 'chpass', ok, err});
+  if (!a) return reply(false, 'Akun tidak ditemukan.');
+  const old = String(m.old || ''), pass = String(m.pass || '');
+  const wait = Math.max(blockedFor('ip:' + c.ip), blockedFor('u:' + key));
+  if (wait) return reply(false, 'Terlalu banyak percobaan gagal. Coba lagi dalam ' + wait + ' detik.');
+  if (!old) return reply(false, 'Isi password lama.');
+  if (pass.length < 6) return reply(false, 'Password baru minimal 6 karakter.');
+  if (pass.length > 200 || old.length > 200) return reply(false, 'Password terlalu panjang.');
+  if (!safeEq(await scryptAsync(old, a.salt), a.hash)){
+    noteFail('ip:' + c.ip); noteFail('u:' + key);
+    return reply(false, 'Password lama salah.');
+  }
+  if (old === pass) return reply(false, 'Password baru sama dengan password lama.');
+  const salt = crypto.randomBytes(16).toString('hex'), hash = await scryptAsync(pass, salt);
+  if (accounts[key] !== a) return reply(false, 'Akun berubah, coba lagi.');
+  a.salt = salt; a.hash = hash; a.passChanged = Date.now(); saveAccounts();
+  fails.delete('u:' + key);
+  console.log('[akun] ' + a.name + ' mengganti password');
+  reply(true);
+}
+  return {handleAuth, handleChangePass};
 };

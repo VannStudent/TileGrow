@@ -629,6 +629,19 @@ function bindUI(){
   $('mControls').onclick = ()=> openControlPicker(false);
   $('mLobby').onclick = ()=> exitToLobby();
   $('mLogout').onclick = ()=>{ closeModals(); logout(); };
+  $('mPass').onclick = ()=>{ closeModals(); openPassModal(); };
+  let pwBusy = false;
+  const pwSubmit = async ()=>{
+    if (pwBusy) return; pwBusy = true; $('pwOk').disabled = true; $('pwErr').textContent = '';
+    try {
+      const err = await changePassword($('pwOld').value, $('pwNew').value, $('pwNew2').value);
+      if (err){ $('pwErr').textContent = err; return; }
+      ['pwOld', 'pwNew', 'pwNew2'].forEach(id => $(id).value = '');
+      closeModals(); toast('Password berhasil diganti.');
+    } finally { pwBusy = false; $('pwOk').disabled = false; }
+  };
+  $('pwOk').onclick = pwSubmit;
+  ['pwOld', 'pwNew', 'pwNew2'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') pwSubmit(); }));
   $('mRespawn').onclick = ()=>{ closeModals(); respawn('Respawn di pintu utama.'); };
   $('mGuest').onclick = ()=>{ guest = !guest; $('mGuest').textContent = guest ? 'Main sebagai Kamu' : 'Main sebagai Tamu (tes lock)'; closeModals(); toast(guest ? 'Mode tamu: kamu tidak punya akses ke area yang dikunci.' : 'Kembali sebagai pemilik.'); refreshUI(); };
   $('mNew').onclick = ()=>{ if (confirm('Buat dunia baru? Dunia, tas, gems, dan level sekarang akan hilang.')){ genWorld(); rollQuests(); respawn(); save(); closeModals(); toast('Dunia baru dibuat.'); refreshUI(); } };
